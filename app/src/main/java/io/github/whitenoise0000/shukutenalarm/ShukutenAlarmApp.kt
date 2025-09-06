@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
  * - Hilt を有効化し、アプリ全体の DI コンテナを初期化する。
  */
 @HiltAndroidApp
-class ShukutenAlermApp : Application() {
+class ShukutenAlarmApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // 通知チャンネルを初期化
@@ -20,7 +20,7 @@ class ShukutenAlermApp : Application() {
         // 祝日データのオンライン更新をバックグラウンドで試行（30日以上古い場合）
         ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
             runCatching {
-                io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository(this@ShukutenAlermApp)
+                io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository(this@ShukutenAlarmApp)
                     .refreshIfStale(maxAgeDays = 30)
             }
         }
