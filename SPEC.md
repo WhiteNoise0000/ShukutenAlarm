@@ -466,8 +466,3 @@ implementation("com.google.android.exoplayer:exoplayer:<latest>")
 - バックアップ/リストア（`DocumentFile` 経由でJSON書出し）。
 
 以上。
-5. 今後拡張
-
-- バックアップ/リストア（`DocumentFile` 経由でJSON書出し）。
-
-以上。

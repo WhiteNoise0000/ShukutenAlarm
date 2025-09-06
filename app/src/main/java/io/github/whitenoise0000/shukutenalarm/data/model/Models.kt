@@ -1,6 +1,9 @@
 package io.github.whitenoise0000.shukutenalarm.data.model
 
 import android.net.Uri
+import io.github.whitenoise0000.shukutenalarm.data.serializers.LocalTimeSerializer
+import io.github.whitenoise0000.shukutenalarm.data.serializers.UriSerializer
+import kotlinx.serialization.Serializable
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -28,10 +31,12 @@ enum class VolumeMode { SYSTEM, CUSTOM }
  * アラーム仕様を表すデータモデル。
  * - 仕様書のサンプルに準拠。
  */
+@Serializable
 data class AlarmSpec(
     val id: Int,
     /** アラーム名。区別しやすくするための任意名（空文字許容）。 */
     val name: String = "",
+    @Serializable(with = LocalTimeSerializer::class)
     val time: LocalTime,
     val daysOfWeek: Set<DayOfWeek>,
     val holidayPolicy: HolidayPolicy,
@@ -46,8 +51,9 @@ data class AlarmSpec(
     /** 祝日のみ鳴動するかどうか（true の場合は非祝日をスキップ）。 */
     val holidayOnly: Boolean = false,
     val prefetchMinutes: Int = 45,
-    val soundMapping: Map<WeatherCategory, Uri>,
+    val soundMapping: Map<WeatherCategory, @Serializable(with = UriSerializer::class) Uri>,
     /** デフォルトサウンド（天気別が未設定時のフォールバック）。既存互換のためプロパティ名は holidaySound を流用。 */
+    @Serializable(with = UriSerializer::class)
     val holidaySound: Uri? = null,
     val enabled: Boolean = true
 )

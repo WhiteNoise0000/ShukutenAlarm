@@ -3,7 +3,7 @@ package io.github.whitenoise0000.shukutenalarm.widget
 import android.content.Context
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
-import io.github.whitenoise0000.shukutenalarm.data.AlarmRepository
+
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
 import io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
@@ -27,7 +27,7 @@ import java.time.ZonedDateTime
  * - 依存は最小限に抑えるため、Hilt は使わずに都度 Repository を生成する。
  */
 class NextAlarmCalculator(private val context: Context) {
-    private val repo: AlarmRepository by lazy { DataStoreAlarmRepository(context) }
+    private val repo: DataStoreAlarmRepository by lazy { DataStoreAlarmRepository(context) }
     private val holidays by lazy { HolidayRepository(context) }
 
     /**
