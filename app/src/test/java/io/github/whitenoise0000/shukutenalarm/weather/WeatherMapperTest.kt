@@ -1,6 +1,7 @@
 package io.github.whitenoise0000.shukutenalarm.weather
 
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
+import io.github.whitenoise0000.shukutenalarm.data.model.toCategory
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -12,38 +13,37 @@ class WeatherMapperTest {
     @Test
     fun mapsClearCodeToCLEAR() {
         // 0 は快晴
-        assertEquals(WeatherCategory.CLEAR, WeatherMapper.fromWmo(0))
+        assertEquals(WeatherCategory.CLEAR, 0.toCategory())
     }
 
     @Test
     fun mapsCloudyCodesToCLOUDY() {
         // 1..3 は雲量に応じて概ね曇り扱い
-        assertEquals(WeatherCategory.CLOUDY, WeatherMapper.fromWmo(1))
-        assertEquals(WeatherCategory.CLOUDY, WeatherMapper.fromWmo(2))
-        assertEquals(WeatherCategory.CLOUDY, WeatherMapper.fromWmo(3))
+        assertEquals(WeatherCategory.CLOUDY, 1.toCategory())
+        assertEquals(WeatherCategory.CLOUDY, 2.toCategory())
+        assertEquals(WeatherCategory.CLOUDY, 3.toCategory())
         // 未知コードは曇りに丸められる
-        assertEquals(WeatherCategory.CLOUDY, WeatherMapper.fromWmo(1234))
+        assertEquals(WeatherCategory.CLOUDY, 1234.toCategory())
     }
 
     @Test
     fun mapsRainCodesToRAIN() {
         // 51..57, 61..65, 80..82 は雨カテゴリ
-        assertEquals(WeatherCategory.RAIN, WeatherMapper.fromWmo(51))
-        assertEquals(WeatherCategory.RAIN, WeatherMapper.fromWmo(61))
-        assertEquals(WeatherCategory.RAIN, WeatherMapper.fromWmo(80))
+        assertEquals(WeatherCategory.RAIN, 51.toCategory())
+        assertEquals(WeatherCategory.RAIN, 61.toCategory())
+        assertEquals(WeatherCategory.RAIN, 80.toCategory())
     }
 
     @Test
     fun mapsSnowCodesToSNOW() {
         // 71..75, 85, 86 は雪カテゴリ
-        assertEquals(WeatherCategory.SNOW, WeatherMapper.fromWmo(71))
-        assertEquals(WeatherCategory.SNOW, WeatherMapper.fromWmo(86))
+        assertEquals(WeatherCategory.SNOW, 71.toCategory())
+        assertEquals(WeatherCategory.SNOW, 86.toCategory())
     }
 
     @Test
     fun mapsThunderCodesToTHUNDER() {
         // 95..99 は雷ではなく雨カテゴリ
-        assertEquals(WeatherCategory.RAIN, WeatherMapper.fromWmo(95))
+        assertEquals(WeatherCategory.RAIN, 95.toCategory())
     }
 }
-

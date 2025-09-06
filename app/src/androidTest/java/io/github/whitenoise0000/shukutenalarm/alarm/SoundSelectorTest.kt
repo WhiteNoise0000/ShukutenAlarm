@@ -47,17 +47,7 @@ class SoundSelectorTest {
     }
 
     @Test
-    fun selectSound_usesHolidaySound_whenHoliday() {
-        val uri = SoundSelector.selectSound(
-            spec = spec(HolidayPolicy.SAME),
-            weather = WeatherCategory.RAIN,
-            defaultUriProvider = { defUri }
-        )
-        assertEquals(holiday, uri)
-    }
-
-    @Test
-    fun selectSound_usesWeatherMapping_whenWeekday() {
+    fun selectSound_usesWeatherMapping() {
         val uri = SoundSelector.selectSound(
             spec = spec(HolidayPolicy.SAME),
             weather = WeatherCategory.RAIN,
@@ -67,10 +57,22 @@ class SoundSelectorTest {
     }
 
     @Test
-    fun selectSound_fallbacksToDefault_whenNoWeather() {
+    fun selectSound_usesHolidaySound_asFallback() {
+        val s = spec(HolidayPolicy.SAME)
         val uri = SoundSelector.selectSound(
-            spec = spec(HolidayPolicy.SAME),
-            weather = null,
+            spec = s.copy(soundMapping = emptyMap()), // No weather mapping
+            weather = WeatherCategory.RAIN,
+            defaultUriProvider = { defUri }
+        )
+        assertEquals(holiday, uri)
+    }
+
+    @Test
+    fun selectSound_fallbacksToDefault() {
+        val s = spec(HolidayPolicy.SAME)
+        val uri = SoundSelector.selectSound(
+            spec = s.copy(soundMapping = emptyMap(), holidaySound = null), // No weather mapping and no holiday sound
+            weather = WeatherCategory.RAIN,
             defaultUriProvider = { defUri }
         )
         assertEquals(defUri, uri)

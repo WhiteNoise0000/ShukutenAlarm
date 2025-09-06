@@ -34,8 +34,8 @@ class SoundSelectorTest {
         assertTrue(SoundSelector.shouldRing(spec, isHoliday = false))
     }
 
-    @Test
-    fun selectSound_prefersHolidaySound_whenHoliday() {
+        @Test
+    fun selectSound_prefersWeatherMapping_overHolidaySound() {
         val holiday = Uri.parse("content://holiday")
         val rain = Uri.parse("content://rain")
         val spec = specBase().copy(
@@ -45,7 +45,7 @@ class SoundSelectorTest {
         val selected = SoundSelector.selectSound(spec, weather = WeatherCategory.RAIN) {
             Uri.parse("content://default")
         }
-        assertEquals(holiday, selected)
+        assertEquals(rain, selected)
     }
 
     @Test
