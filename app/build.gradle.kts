@@ -75,8 +75,10 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.okhttp.logging)
 
-    // ExoPlayer（再生ライブラリ）
-    implementation(libs.exoplayer)
+    // Media3（再生ライブラリ）
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.session)
 
     // DI（Hilt）と WorkManager 連携
     implementation(libs.hilt.android)

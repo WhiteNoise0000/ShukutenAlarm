@@ -36,8 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import io.github.whitenoise0000.shukutenalarm.R
 import io.github.whitenoise0000.shukutenalarm.alarm.AlarmGateway
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
@@ -76,6 +79,7 @@ class RingingActivity : ComponentActivity() {
     }
 }
 
+@UnstableApi
 @Composable
 private fun RingingScreen(
     alarmId: Int,
@@ -109,9 +113,9 @@ private fun RingingScreen(
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             setAudioAttributes(
-                com.google.android.exoplayer2.audio.AudioAttributes.Builder()
-                    .setUsage(com.google.android.exoplayer2.C.USAGE_ALARM)
-                    .setContentType(com.google.android.exoplayer2.C.AUDIO_CONTENT_TYPE_MUSIC)
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_ALARM)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                     .build(),
                 false
             )

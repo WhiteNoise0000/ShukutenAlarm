@@ -82,7 +82,7 @@
 
 1. アラーム登録: UI→AlarmGateway→`setAlarmClock()` で exact 登録。
 2. 事前天気取得: アラーム時刻の N 分前（既定 45）に `OneTimeWorkRequest` をスケジュール（ネットワーク接続時）。
-3. 鳴動: BroadcastReceiver→フルスクリーン Activity 起動、ExoPlayer/Ringtone で再生（USAGE_ALARM）。
+3. 鳴動: BroadcastReceiver→フルスクリーン Activity 起動、Media3/Ringtone で再生（USAGE_ALARM）。
 4. 音源選択: 祝日か否かは鳴動可否（SKIP/DELAY/SAME）にのみ影響。サウンドは WeatherCategory のマッピングを使用し、未設定時はデフォルトにフォールバック（祝日優先ロジックなし）。
 
 ---
@@ -462,6 +462,11 @@ implementation("com.google.android.exoplayer:exoplayer:<latest>")
 ---
 
 ## 25. 今後拡張
+
+- バックアップ/リストア（`DocumentFile` 経由でJSON書出し）。
+
+以上。
+5. 今後拡張
 
 - バックアップ/リストア（`DocumentFile` 経由でJSON書出し）。
 
