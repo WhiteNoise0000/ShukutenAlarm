@@ -54,7 +54,7 @@ class NextAlarmWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.text_sub, "")
         } else {
             val timeFmt = DateTimeFormatter.ofPattern("H:mm", Locale.JAPAN)
-            val dateFmt = DateTimeFormatter.ofPattern("yy/M/d(E)", Locale.JAPAN)
+            val dateFmt = DateTimeFormatter.ofPattern("M/d(E)", Locale.JAPAN)
             val dt = next.dateTime
             views.setTextViewText(R.id.text_title, context.getString(R.string.widget_next_alarm_title))
             views.setTextViewText(R.id.text_time, dt.toLocalTime().format(timeFmt))
