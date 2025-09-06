@@ -672,6 +672,8 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
                                             putExtra("weatherLabel", weatherLabel(ctx, cat))
                                             putExtra("isHoliday", false)
                                             putExtra("holidayName", "")
+                                                                                        putExtra("holidayName", "")
+                                            putExtra("alarmName", nameState.value)
                                             putExtra("volume", if (volumeModeState.value == VolumeMode.CUSTOM) (volumePercentState.floatValue / 100f) else 1f)
                                         }
                                         ContextCompat.startActivity(ctx, intent, null)
@@ -1149,13 +1151,13 @@ private fun AlarmCard(
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             RowAlignCenter {
                 Icon(Icons.Outlined.Alarm, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                val title = spec.name.ifBlank { "#${spec.id}" }
+                @SuppressLint("DefaultLocale")
                 Text(
                     text = String.format("%02d:%02d", spec.time.hour, spec.time.minute),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
-                    text = title,
+                    text = spec.name.takeIf { it.isNotBlank() } ?: "",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),

@@ -20,14 +20,16 @@ class AlarmGateway(private val context: Context) {
             context, spec.id,
             Intent(context, AlarmReceiver::class.java)
                 .setAction(ACTION_ALARM_FIRE)
-                .putExtra(EXTRA_ALARM_ID, spec.id),
+                .putExtra(EXTRA_ALARM_ID, spec.id)
+                .putExtra(EXTRA_ALARM_NAME, spec.name),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val fsiIntent = PendingIntent.getActivity(
             context, spec.id,
             Intent(context, RingingActivity::class.java)
-                .putExtra(EXTRA_ALARM_ID, spec.id),
+                .putExtra(EXTRA_ALARM_ID, spec.id)
+                .putExtra(EXTRA_ALARM_NAME, spec.name),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -39,6 +41,7 @@ class AlarmGateway(private val context: Context) {
     companion object {
         const val ACTION_ALARM_FIRE = "io.github.whitenoise0000.shukutenalarm.action.ALARM_FIRE"
         const val EXTRA_ALARM_ID = "id"
+        const val EXTRA_ALARM_NAME = "alarmName"
     }
 }
 

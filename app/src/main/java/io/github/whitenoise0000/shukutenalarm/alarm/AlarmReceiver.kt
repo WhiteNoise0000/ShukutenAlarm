@@ -91,6 +91,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("volumePercent", spec.volumePercent)
                     putExtra("vibrate", spec.vibrate)
                     putExtra("respectSilent", spec.respectSilentMode)
+                    putExtra("alarmName", spec.name)
                 }
 
                 // 通知権限があればフルスクリーン通知、なければ直接起動

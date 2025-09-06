@@ -52,6 +52,7 @@ class NextAlarmWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.text_title, context.getString(R.string.widget_next_alarm_title))
             views.setTextViewText(R.id.text_time, context.getString(R.string.widget_no_alarm))
             views.setTextViewText(R.id.text_sub, "")
+            views.setViewVisibility(R.id.text_alarm_name, android.view.View.GONE)
         } else {
             val timeFmt = DateTimeFormatter.ofPattern("H:mm", Locale.JAPAN)
             val dateFmt = DateTimeFormatter.ofPattern("M/d(E)", Locale.JAPAN)
@@ -60,6 +61,13 @@ class NextAlarmWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.text_time, dt.toLocalTime().format(timeFmt))
             val holidayMark = if (next.isHoliday) " [" + context.getString(R.string.label_holiday) + "]" else ""
             views.setTextViewText(R.id.text_sub, dt.toLocalDate().format(dateFmt) + holidayMark)
+
+            if (next.spec.name.isNotBlank()) {
+                views.setTextViewText(R.id.text_alarm_name, next.spec.name)
+                views.setViewVisibility(R.id.text_alarm_name, android.view.View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.text_alarm_name, android.view.View.GONE)
+            }
         }
 
         // 本体タップでアプリ起動

@@ -67,7 +67,8 @@ class RingingActivity : ComponentActivity() {
                     titleText = stringResource(R.string.text_ringing),
                     weatherLabel = intent.getStringExtra("weatherLabel").orEmpty(),
                     isHoliday = intent.getBooleanExtra("isHoliday", false),
-                    holidayName = intent.getStringExtra("holidayName").orEmpty(),
+                                        holidayName = intent.getStringExtra("holidayName").orEmpty(),
+                    alarmName = intent.getStringExtra("alarmName").orEmpty(),
                     volumeMode = runCatching { VolumeMode.valueOf(intent.getStringExtra("volumeMode") ?: VolumeMode.SYSTEM.name) }.getOrDefault(VolumeMode.SYSTEM),
                     volumePercent = intent.getIntExtra("volumePercent", 100).coerceIn(0,100),
                     vibrate = intent.getBooleanExtra("vibrate", false),
@@ -87,7 +88,8 @@ private fun RingingScreen(
     titleText: String,
     weatherLabel: String,
     isHoliday: Boolean,
-    holidayName: String,
+        holidayName: String,
+    alarmName: String,
     volumeMode: VolumeMode,
     volumePercent: Int,
     vibrate: Boolean,
@@ -164,6 +166,10 @@ private fun RingingScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(text = titleText, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            if (alarmName.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(text = alarmName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
             // 天気ラベルは未取得でも明示的に表示して切り分けやすくする
             run {
                 val label = weatherLabel.ifBlank { stringResource(R.string.text_unknown) }

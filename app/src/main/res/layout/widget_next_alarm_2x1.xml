@@ -13,6 +13,21 @@
     android:background="@drawable/bg_widget_card"
     android:padding="12dp">
 
+    <!-- 右: アラーム名（あれば） -->
+    <TextView
+        android:id="@+id/text_alarm_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/button_skip"
+        android:layout_alignEnd="@id/button_skip"
+        android:layout_marginBottom="2dp"
+        android:textColor="#B3FFFFFF"
+        android:textSize="10sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:visibility="gone" />
+
     <!-- 右: スキップボタン -->
     <TextView
         android:id="@+id/button_skip"
