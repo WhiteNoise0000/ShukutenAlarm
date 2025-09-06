@@ -1,0 +1,128 @@
+<resources>
+    <string name="app_name">HolidayAlerm</string>
+
+    <!-- タイトル/ラベル -->
+    <string name="title_alarm_list">アラーム一覧</string>
+    <string name="title_add_alarm">アラーム追加</string>
+    <string name="title_settings">設定</string>
+
+    <string name="label_settings">設定</string>
+    <string name="label_alarm_name">アラーム名</string>
+    <string name="label_days">曜日</string>
+    <string name="label_holiday_policy">祝日ポリシー</string>
+    <string name="label_weather_sounds">天気別サウンド</string>
+    <string name="label_default_sound">デフォルトサウンド</string>
+    <string name="label_alarm_options">鳴動オプション</string>
+    <string name="label_volume">音量</string>
+    <string name="label_vibrate">バイブレーション</string>
+    <string name="label_respect_silent">マナー/サイレントに従う</string>
+    <string name="label_holiday_sound">祝日サウンド</string>
+    <string name="label_enabled_toggle">有効</string>
+    <string name="label_pick_time_format">時刻を選択（%1$s）</string>
+    <string name="label_holiday_only">祝日のみ鳴動</string>
+    <string name="label_delay_minutes_holiday">祝日DELAY（分）</string>
+    <string name="label_holiday_refresh_monthly">月1回自動で更新</string>
+    <string name="label_wifi_only">Wi‑Fiのみで更新</string>
+    <string name="label_holiday_last_updated">最終更新: %1$s</string>
+    <string name="label_holiday_last_updated_never">最終更新: 未取得</string>
+    <string name="label_today_holiday">今日は祝日です</string>
+    <string name="label_weather_prefix">天気: %1$s</string>
+
+    <!-- 操作/アクション -->
+    <string name="label_add">追加</string>
+    <string name="text_save">保存</string>
+    <string name="text_cancel">キャンセル</string>
+    <string name="action_delete">削除</string>
+    <string name="action_edit">編集</string>
+    <string name="action_pick_time">時刻を選択</string>
+    <string name="action_preview">プレビュー</string>
+    <string name="action_stop">停止</string>
+    <string name="action_snooze">スヌーズ</string>
+    <string name="action_back">戻る</string>
+    <string name="action_search">検索</string>
+    <string name="action_searching">検索中…</string>
+    <string name="action_select">選択</string>
+    <string name="action_detect_current_location">現在地を取得</string>
+
+    <!-- 設定/現在地・天気 -->
+    <string name="hint_city_search">都市名で検索（例: 東京, Osaka）</string>
+    <string name="settings_weather_header">天気の取得元</string>
+    <string name="settings_weather_desc">アラーム時の天気判定に使用します。都市を指定するか、現在地を使用できます。</string>
+    <string name="settings_source_city">都市を指定</string>
+    <string name="settings_source_current">現在地を使用</string>
+    <string name="settings_weather_privacy">位置情報は天気予報の取得のみに使用し、外部に送信しません。</string>
+    <string name="settings_weather_timing">現在地は「アラーム直前の天気先読み」で取得します</string>
+
+    <!-- 祝日自動更新 -->
+    <string name="title_holiday_refresh">祝日データ更新</string>
+    <string name="hint_holiday_refresh">更新はバックグラウンドで行います。Wi‑Fiのみを有効にするとモバイル回線では更新しません。</string>
+    <string name="action_refresh_now">今すぐ更新</string>
+    <string name="action_refreshing">更新中…</string>
+    <string name="text_refreshed">更新しました</string>
+    <string name="error_refresh_failed">更新に失敗しました</string>
+
+    <!-- ポリシー -->
+    <string name="policy_same">同じ</string>
+    <string name="policy_delay">遅らせる</string>
+    <string name="policy_skip">スキップ</string>
+
+    <!-- 音量モード -->
+    <string name="volume_mode_default">デフォルト</string>
+    <string name="volume_mode_custom">個別設定</string>
+
+    <!-- ステータス/メッセージ -->
+    <string name="text_unset">未設定</string>
+    <string name="text_set">設定済み</string>
+    <string name="text_device_default">端末デフォルト</string>
+    <string name="text_unknown">不明</string>
+    <string name="text_ringing">アラーム鳴動中</string>
+    <string name="empty_alarms_title">アラームがありません</string>
+    <string name="empty_alarms_message">＋ ボタンでアラームを追加してください</string>
+
+    <!-- 通知 -->
+    <string name="notif_channel_alarm_name">アラーム</string>
+    <string name="notif_channel_alarm_desc">アラーム鳴動用の通知チャンネル</string>
+    <string name="notif_alarm_ringing">アラームが鳴っています</string>
+
+    <!-- エラー -->
+    <string name="error_empty_query">都市名を入力してください</string>
+    <string name="error_no_results">検索結果が見つかりません。ヒットしない場合はローマ字（Osaka, Kyoto）でもお試しください。検索APIの仕様により、区/町/村はヒットしない場合があります。</string>
+    <string name="error_network_generic">通信に失敗しました。ネットワーク状態を確認してください</string>
+
+    <!-- 曜日/天気 -->
+    <string name="dow_mon">月</string>
+    <string name="dow_tue">火</string>
+    <string name="dow_wed">水</string>
+    <string name="dow_thu">木</string>
+    <string name="dow_fri">金</string>
+    <string name="dow_sat">土</string>
+    <string name="dow_sun">日</string>
+    <string name="weather_clear">晴れ</string>
+    <string name="weather_cloudy">くもり</string>
+    <string name="weather_rain">雨</string>
+    <string name="weather_snow">雪</string>
+    <string name="weather_thunder">雷</string>
+
+    <!-- ポリシー説明 -->
+    <string name="hint_policy_same">祝日も平日と同様に鳴動します</string>
+    <string name="hint_policy_delay_format">祝日は%1$d分遅らせて鳴動します</string>
+    <string name="hint_policy_skip">祝日は鳴動しません（次の対象日にスキップ）</string>
+    <string name="hint_holiday_only_days_ignored">祝日のみが対象のため、曜日設定は無視されます</string>
+    <string name="hint_respect_silent">注意: マナーやサイレント中は鳴らない場合があります（端末設定・USAGE_ALARMの挙動に依存）</string>
+    <string name="text_inherit_default">デフォルト適用</string>
+    <string name="label_preview">プレビュー</string>
+    <string name="label_selected_city">選択中の都市: %1$s</string>
+    <string name="label_disabled">無効</string>
+
+    <!-- トースト -->
+    <string name="toast_alarm_saved">アラームを保存しました</string>
+    <string name="toast_alarm_deleted">アラームを削除しました</string>
+    <string name="toast_alarm_enabled">アラームを有効にしました</string>
+    <string name="toast_alarm_disabled">アラームを無効にしました</string>
+    <string name="toast_settings_saved">設定を保存しました</string>
+    <string name="toast_holidays_refreshed">祝日データを更新しました</string>
+    <string name="toast_city_selected">都市を選択しました</string>
+</resources>
+
+
+

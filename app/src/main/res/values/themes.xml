@@ -1,0 +1,7 @@
+<resources>
+    <!-- Material3 ベースのアプリテーマ（Compose 用, NoActionBar） -->
+    <style name="Theme.ShukutenAlerm" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+</resources>

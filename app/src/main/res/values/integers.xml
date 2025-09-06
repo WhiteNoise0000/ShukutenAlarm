@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- スヌーズの既定分数（仕様: 鳴動画面からの一時再鳴動） -->
+    <integer name="snooze_minutes_default">10</integer>
+</resources>
+
