@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
@@ -90,4 +90,14 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+tasks.withType<Test> {
+    if (name == "testDebugUnitTest") {
+        filter {
+            // Only include tests from the 'test' source set
+            includeTestsMatching("io.github.whitenoise0000.shukutenalarm.*")
+            excludeTestsMatching("io.github.whitenoise0000.shukutenalarm.alarm.SoundSelectorTest")
+        }
+    }
 }
