@@ -7,7 +7,6 @@ import io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
 import io.github.whitenoise0000.shukutenalarm.data.model.toCategory
-import kotlinx.serialization.json.Json
 
 /**
  * 天気取得用のリポジトリ。
@@ -16,15 +15,18 @@ import kotlinx.serialization.json.Json
  */
 class WeatherRepository(
     private val context: Context,
-    private val api: OpenMeteoApi,
-    private val json: Json
+    private val api: OpenMeteoApi
 ) {
     /**
      * 当日の代表的な天気カテゴリを推定して返す（簡易: 最初の時間の weathercode を使用）。
      */
     suspend fun fetchTodayCategory(lat: Double, lon: Double): WeatherCategory? {
+        // Open‑Meteo のデータは一部の時間で null が混在する可能性があるため、
+        // 最初に現れる非 null の weathercode を使用する。
         val res = api.jma(lat = lat, lon = lon)
-        val code = res.hourly.weathercode.firstOrNull() ?: return null
+        val code = res.hourly.weathercode
+            ?.firstOrNull { it != null }
+            ?: return null
         return code.toCategory()
     }
 
@@ -36,7 +38,7 @@ class WeatherRepository(
         // 最小限の JSON を保存（timestamp は簡易に System.currentTimeMillis）
         val value = cat?.name ?: ""
         val now = System.currentTimeMillis()
-        val jsonText = "{" + "\"timestamp\":$now,\"category\":\"$value\"}"
+        val jsonText = "{\"timestamp\":$now,\"category\":\"$value\"}"
         val key = stringPreferencesKey(PreferencesKeys.KEY_LAST_WEATHER_JSON)
         context.appDataStore.edit { prefs ->
             prefs[key] = jsonText

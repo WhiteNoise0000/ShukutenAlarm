@@ -37,7 +37,7 @@ class AlarmGateway(private val context: Context) {
     }
 
     companion object {
-        const val ACTION_ALARM_FIRE = "io.github.whitenoise0000.holidayalerm.action.ALARM_FIRE"
+        const val ACTION_ALARM_FIRE = "io.github.whitenoise0000.shukutenalarm.action.ALARM_FIRE"
         const val EXTRA_ALARM_ID = "id"
     }
 }

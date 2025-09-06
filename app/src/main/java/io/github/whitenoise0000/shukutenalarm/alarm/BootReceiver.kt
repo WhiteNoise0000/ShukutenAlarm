@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
+import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,6 +26,8 @@ class BootReceiver : BroadcastReceiver() {
             list.filter { it.enabled }.forEach { spec ->
                 scheduler.scheduleNext(spec)
             }
+            // ウィジェットへ更新通知（再起動後の次回反映）
+            context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
         }
     }
 }

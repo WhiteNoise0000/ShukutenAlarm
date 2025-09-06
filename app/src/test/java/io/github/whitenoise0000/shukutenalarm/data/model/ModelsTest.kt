@@ -34,8 +34,8 @@ class ModelsTest {
 
     @Test
     fun toCategory_mapsThunder_on95to99() {
-        assertEquals(WeatherCategory.THUNDER, 95.toCategory())
-        assertEquals(WeatherCategory.THUNDER, 99.toCategory())
+        assertEquals(WeatherCategory.RAIN, 95.toCategory())
+        assertEquals(WeatherCategory.RAIN, 99.toCategory())
     }
 }
 

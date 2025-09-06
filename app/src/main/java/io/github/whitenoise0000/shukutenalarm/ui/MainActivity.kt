@@ -1,15 +1,21 @@
 package io.github.whitenoise0000.shukutenalarm.ui
 
+// AutoMirrored版の音量アイコンを利用（RTL対応）。
+// ネットワーククライアントのユーティリティ（Retrofit/kotlinx-serialization 用）
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.Manifest
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -17,18 +23,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.VolumeDown
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Alarm
@@ -40,9 +50,6 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Save
-// AutoMirrored版の音量アイコンを利用（RTL対応）。
-import androidx.compose.material.icons.automirrored.outlined.VolumeDown
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Snooze
@@ -74,6 +81,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -86,40 +94,43 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.ImeAction
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.NavHostController
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import io.github.whitenoise0000.shukutenalarm.R
 import io.github.whitenoise0000.shukutenalarm.alarm.ScheduleManager
-import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
+import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
 import io.github.whitenoise0000.shukutenalarm.data.model.HolidayPolicy
 import io.github.whitenoise0000.shukutenalarm.data.model.VolumeMode
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
-import io.github.whitenoise0000.shukutenalarm.R
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
 import io.github.whitenoise0000.shukutenalarm.ui.theme.HolidayAlermTheme
-import io.github.whitenoise0000.shukutenalarm.weather.GeocodingRepository
 import io.github.whitenoise0000.shukutenalarm.weather.GeoPlace
-import java.time.DayOfWeek
-import java.time.LocalTime
-import kotlin.math.roundToInt
+import io.github.whitenoise0000.shukutenalarm.weather.GeocodingRepository
+import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.widget.Toast
-
+import okhttp3.MediaType.Companion.toMediaType
+import java.time.DayOfWeek
+import java.time.LocalTime
+import kotlin.math.roundToInt
 
 
 /**
@@ -152,6 +163,9 @@ private fun AppRoot() {
 
     // スクロール時にトップバーの影や高さが自然に変化する挙動
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    // アプリ起動時に不足権限のリクエストを行う（POST_NOTIFICATIONS / ACCESS_COARSE_LOCATION）。
+    PermissionsAtLaunch()
 
     Scaffold(
         topBar = {
@@ -212,6 +226,41 @@ private fun AppRoot() {
     }
 }
 
+/**
+ * アプリ起動時に不足権限のリクエストを行うコンポーザブル。
+ * - 通知権限: Android 13+（POST_NOTIFICATIONS）。
+ * - 位置権限: 設定で「現在地を使用」が有効な場合のみ、ACCESS_COARSE_LOCATION を要求。
+ */
+@Composable
+private fun PermissionsAtLaunch() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val asked = remember { mutableStateOf(false) }
+
+    // ランチャーを先に用意
+    val requestNotif = rememberLauncherForActivityResult(RequestPermission()) { /* 結果はとくに何もしない */ }
+    val requestLocation = rememberLauncherForActivityResult(RequestPermission()) { /* 同上 */ }
+
+    LaunchedEffect(Unit) {
+        if (asked.value) return@LaunchedEffect
+        asked.value = true
+
+        // 通知権限（minSdk 33 以上のため常に対象）
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            requestNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        // 位置権限（現在地使用時のみ）
+        val useCurrent = withContext(Dispatchers.IO) { SettingsRepository(context).settingsFlow.first().useCurrentLocation }
+        if (useCurrent) {
+            val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (!coarse) {
+                requestLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppNavHost(navController: NavHostController, editSaveAction: androidx.compose.runtime.MutableState<(() -> Unit)?>) {
     NavHost(navController = navController, startDestination = "home") {
@@ -227,7 +276,10 @@ private fun AppNavHost(navController: NavHostController, editSaveAction: android
             val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
             EditAlarmScreenModern(alarmId = id, onDone = { navController.popBackStack() }, registerSave = { action -> editSaveAction.value = action })
         }
-        composable("settings") { SettingsScreenModernNew() }
+        composable("settings") {
+            // 設定保存後はアラーム一覧へ戻るため、コールバックを渡す
+            SettingsScreenModernNew(onSaved = { navController.popBackStack() })
+        }
     }
 }
 
@@ -238,11 +290,49 @@ private fun AlarmListScreen(onAdd: () -> Unit, onSettings: () -> Unit, onEdit: (
     val scheduler = remember { ScheduleManager(context) }
     val list = remember { mutableStateListOf<AlarmSpec>() }
     val scope = rememberCoroutineScope()
+    // 画面再表示（RESUME）時の最新化用トリガ。
+    val refreshTick = remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         val items = withContext(Dispatchers.IO) { repo.list() }
         val sorted = items.sortedBy { it.time }
         list.clear(); list.addAll(sorted)
+    }
+
+    // 画面復帰（ON_RESUME）時に一覧を最新化し、カード側のスキップ表示も再計算させる。
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    val items = withContext(Dispatchers.IO) { repo.list() }
+                    val sorted = items.sortedBy { it.time }
+                    list.clear(); list.addAll(sorted)
+                    refreshTick.intValue++
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // ウィジェット等からの更新ブロードキャストで即時再読込
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                scope.launch {
+                    val items = withContext(Dispatchers.IO) { repo.list() }
+                    val sorted = items.sortedBy { it.time }
+                    list.clear(); list.addAll(sorted)
+                    refreshTick.intValue++
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(NextAlarmWidgetProvider.ACTION_REFRESH)
+        }
+        context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
     Column(
@@ -273,6 +363,8 @@ private fun AlarmListScreen(onAdd: () -> Unit, onSettings: () -> Unit, onEdit: (
                                 val sorted = items.sortedBy { it.time }
                                 list.clear(); list.addAll(sorted)
                                 Toast.makeText(context, context.getString(R.string.toast_alarm_deleted), Toast.LENGTH_SHORT).show()
+                                // ウィジェットへ更新通知（一覧変化）
+                                context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
                             }
                         },
                         onToggle = { enable ->
@@ -282,8 +374,11 @@ private fun AlarmListScreen(onAdd: () -> Unit, onSettings: () -> Unit, onEdit: (
                                 if (enable) scheduler.scheduleNext(updated) else scheduler.cancel(updated.id)
                                 val msg = if (enable) R.string.toast_alarm_enabled else R.string.toast_alarm_disabled
                                 Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
+                                // ウィジェットへ更新通知（有効/無効切替）
+                                context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
                             }
-                        }
+                        },
+                        refreshKey = refreshTick.intValue
                     )
                 }
             }
@@ -319,7 +414,7 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
 
     val onPicked = remember { mutableStateOf<(Uri?) -> Unit>({}) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val uri: Uri? = if (android.os.Build.VERSION.SDK_INT >= 33) result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java) else @Suppress("DEPRECATION") result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+        val uri: Uri? = result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
         onPicked.value(uri)
     }
     val days = remember { mutableStateListOf(
@@ -392,6 +487,8 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
             scheduler.scheduleNext(spec)
             Toast.makeText(context, context.getString(R.string.toast_alarm_saved), Toast.LENGTH_SHORT).show()
             onDone()
+            // ウィジェットへ更新通知（新規/編集保存）
+            context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
         }
     }
 
@@ -544,7 +641,6 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
                                     WeatherCategory.CLOUDY -> Icons.Outlined.Cloud to MaterialTheme.colorScheme.secondary
                                     WeatherCategory.RAIN -> Icons.Outlined.WaterDrop to MaterialTheme.colorScheme.primary
                                     WeatherCategory.SNOW -> Icons.Outlined.AcUnit to MaterialTheme.colorScheme.primary
-                                    else -> Icons.Outlined.WbSunny to MaterialTheme.colorScheme.primary
                                 }
                                 Icon(icon, contentDescription = null, tint = tint)
                                 Column(modifier = Modifier.weight(1f)) {
@@ -633,7 +729,7 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
                         )
                         // 非推奨APIの置換：AutoMirrored版を利用して将来の互換性とRTL対応を確保
                         Icon(Icons.AutoMirrored.Outlined.VolumeUp, contentDescription = null)
-                        Text(text = "${volumePercentState.floatValue.toInt()}%")
+                        Text(text = stringResource(R.string.volume_percent_format, volumePercentState.floatValue.toInt()))
                     }
                 }
                 // バイブレーション
@@ -664,7 +760,7 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
  * - 祝日のDELAY分、祝日データ自動更新もカードで整理。
  */
 @Composable
-private fun SettingsScreenModernNew() {
+private fun SettingsScreenModernNew(onSaved: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { SettingsRepository(context) }
     val geocoding = remember { GeocodingRepository(context) }
@@ -684,6 +780,9 @@ private fun SettingsScreenModernNew() {
     val holidayLastUpdatedText = remember { mutableStateOf<String?>(null) }
     val holidayRefreshing = remember { mutableStateOf(false) }
     val holidayRefreshMessage = remember { mutableStateOf<String?>(null) }
+    // 天気の即時取得（テスト）用の状態
+    val fetchingWeather = remember { mutableStateOf(false) }
+    val weatherTestMessage = remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -697,7 +796,7 @@ private fun SettingsScreenModernNew() {
         holidayWifiOnly.value = s.holidayRefreshWifiOnly
 
         // 最終更新の読み込み
-        val key = androidx.datastore.preferences.core.longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
+        val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
         val last = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[key] ?: 0L }.first() }
         holidayLastUpdatedText.value = if (last > 0L) {
             val dt = java.time.Instant.ofEpochMilli(last).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
@@ -759,7 +858,7 @@ private fun SettingsScreenModernNew() {
                                 val results = withContext(Dispatchers.IO) { geocoding.searchCity(query) }
                                 if (results.isEmpty()) errorMessage.value = context.getString(R.string.error_no_results) else cityResults.addAll(results)
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             errorMessage.value = context.getString(R.string.error_network_generic)
                         } finally { searching.value = false }
                     }
@@ -818,6 +917,65 @@ private fun SettingsScreenModernNew() {
                         }) { Text(stringResource(R.string.action_detect_current_location)) }
                     }
                     Text(text = stringResource(R.string.settings_weather_privacy), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // 取得テストボタン：現在の選択（都市 or 現在地）に基づく座標で天気取得を即時実行し、キャッシュを温める
+                RowAlignCenter {
+                    Button(
+                        enabled = !fetchingWeather.value,
+                        onClick = {
+                            fetchingWeather.value = true
+                            weatherTestMessage.value = null
+                            scope.launch {
+                                try {
+                                    val useCur = useCurrent.value
+                                    val latD = lat.value.toDoubleOrNull() ?: 35.0
+                                    val lonD = lon.value.toDoubleOrNull() ?: 135.0
+                                    val (latUsed, lonUsed) = if (useCur) {
+                                        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                        if (granted) {
+                                            val loc = withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
+                                            (loc?.latitude ?: latD) to (loc?.longitude ?: lonD)
+                                        } else latD to lonD
+                                    } else latD to lonD
+
+                                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                    val client = okhttp3.OkHttpClient.Builder()
+                                        .addInterceptor(okhttp3.logging.HttpLoggingInterceptor().apply { level = okhttp3.logging.HttpLoggingInterceptor.Level.BASIC })
+                                        .build()
+                                    // Retrofit のコンバータは他箇所と同様に Json 拡張の asConverterFactory を用いる
+                                    val contentType = "application/json".toMediaType()
+                                    val retrofit = retrofit2.Retrofit.Builder()
+                                        .baseUrl("https://api.open-meteo.com/")
+                                        .client(client)
+                                        .addConverterFactory(json.asConverterFactory(contentType))
+                                        .build()
+                                    val api = retrofit.create(io.github.whitenoise0000.shukutenalarm.weather.OpenMeteoApi::class.java)
+                                    val repo = io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository(context, api)
+                                    val cat = withContext(Dispatchers.IO) { repo.prefetchToday(latUsed, lonUsed) }
+                                    if (cat != null) {
+                                        val label = weatherLabel(context, cat)
+                                        val msg = context.getString(R.string.toast_weather_fetched, label)
+                                        weatherTestMessage.value = msg
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val msg = context.getString(R.string.error_weather_fetch_failed)
+                                        weatherTestMessage.value = msg
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (_: Exception) {
+                                    val msg = context.getString(R.string.error_weather_fetch_failed)
+                                    weatherTestMessage.value = msg
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    fetchingWeather.value = false
+                                }
+                            }
+                        }
+                    ) { Text(if (fetchingWeather.value) stringResource(R.string.action_fetching_weather) else stringResource(R.string.action_fetch_weather_now)) }
+                }
+                weatherTestMessage.value?.let { msg ->
+                    Text(text = msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 // 緯度経度のプレビューは非表示（UI簡素化）
@@ -895,7 +1053,7 @@ private fun SettingsScreenModernNew() {
                             scope.launch {
                                 try {
                                     withContext(Dispatchers.IO) { io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository(context).forceRefresh() }
-                                    val key = androidx.datastore.preferences.core.longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
+                                    val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
                                     val last = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[key] ?: 0L }.first() }
                                     if (last > 0L) {
                                         val dt = java.time.Instant.ofEpochMilli(last).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
@@ -903,7 +1061,7 @@ private fun SettingsScreenModernNew() {
                                     }
                                     holidayRefreshMessage.value = context.getString(R.string.text_refreshed)
                                     Toast.makeText(context, context.getString(R.string.toast_holidays_refreshed), Toast.LENGTH_SHORT).show()
-                                } catch (e: Exception) {
+                                } catch (_: Exception) {
                                     holidayRefreshMessage.value = context.getString(R.string.error_refresh_failed)
                                     Toast.makeText(context, context.getString(R.string.error_refresh_failed), Toast.LENGTH_SHORT).show()
                                 } finally {
@@ -943,7 +1101,11 @@ private fun SettingsScreenModernNew() {
                         io.github.whitenoise0000.shukutenalarm.work.HolidaysRefreshScheduler.cancel(context)
                     }
                     saving.value = false
+                    // 設定保存完了のトースト表示後、一覧へ戻る
                     Toast.makeText(context, context.getString(R.string.toast_settings_saved), Toast.LENGTH_SHORT).show()
+                    // ウィジェットへ更新通知（DELAY分などの反映）
+                    context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
+                    onSaved()
                 }
             },
             modifier = Modifier.fillMaxWidth()
@@ -959,8 +1121,25 @@ private fun AlarmCard(
     spec: AlarmSpec,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onToggle: (Boolean) -> Unit
+    onToggle: (Boolean) -> Unit,
+    /** 画面復帰や手動更新に同期して再計算するためのトリガ。*/
+    refreshKey: Int = 0
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    // 1回スキップ状態（期限ミリ秒）
+    val skipUntilLabel = remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(spec.id, refreshKey) {
+        val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_SKIP_UNTIL_PREFIX + spec.id)
+        val epoch = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[key] ?: 0L }.first() }
+        if (epoch > System.currentTimeMillis()) {
+            val dt = java.time.Instant.ofEpochMilli(epoch).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+            val fmt = java.time.format.DateTimeFormatter.ofPattern("M/d(E) H:mm")
+            skipUntilLabel.value = dt.format(fmt)
+        } else {
+            skipUntilLabel.value = null
+        }
+    }
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -1023,6 +1202,31 @@ private fun AlarmCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
+            }
+
+            // 1回スキップ状態の表示と解除
+            if (skipUntilLabel.value != null) {
+                RowAlignCenter {
+                    Icon(Icons.Outlined.Snooze, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                    Text(
+                        text = stringResource(R.string.label_skip_until_format, skipUntilLabel.value ?: ""),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    TextButton(onClick = {
+                        scope.launch {
+                            val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_SKIP_UNTIL_PREFIX + spec.id)
+                            withContext(Dispatchers.IO) { context.appDataStore.edit { prefs -> prefs.remove(key) } }
+                            skipUntilLabel.value = null
+                            Toast.makeText(context, context.getString(R.string.toast_skip_cleared), Toast.LENGTH_SHORT).show()
+                            // ウィジェット更新
+                            context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
+                        }
+                    }) { Text(stringResource(R.string.action_clear_skip)) }
+                }
             }
 
             RowAlignCenter {
@@ -1122,7 +1326,7 @@ private fun weatherLabel(cat: WeatherCategory): String = when (cat) {
     WeatherCategory.SNOW -> stringResource(R.string.weather_snow)
 }
 
-private fun weatherLabel(context: android.content.Context, cat: WeatherCategory): String = when (cat) {
+private fun weatherLabel(context: Context, cat: WeatherCategory): String = when (cat) {
     WeatherCategory.CLEAR -> context.getString(R.string.weather_clear)
     WeatherCategory.CLOUDY -> context.getString(R.string.weather_cloudy)
     WeatherCategory.RAIN -> context.getString(R.string.weather_rain)
@@ -1133,11 +1337,11 @@ private fun weatherLabel(context: android.content.Context, cat: WeatherCategory)
  * Ringtone のタイトルを取得するユーティリティ。
  * - タイトル取得に失敗した場合は「不明」を返す。
  */
-private fun ringtoneTitle(context: android.content.Context, uri: Uri): String =
+private fun ringtoneTitle(context: Context, uri: Uri): String =
     runCatching { RingtoneManager.getRingtone(context, uri)?.getTitle(context) }
         .getOrNull() ?: context.getString(R.string.text_unknown)
 
-private fun getLastKnownCoarse(context: android.content.Context): Location? {
+private fun getLastKnownCoarse(context: Context): Location? {
     val lm = context.getSystemService(LocationManager::class.java) ?: return null
     val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER, LocationManager.GPS_PROVIDER)
     for (p in providers) {

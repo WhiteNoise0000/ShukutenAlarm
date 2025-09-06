@@ -42,7 +42,7 @@ class SoundSelectorTest {
             holidaySound = holiday,
             soundMapping = mapOf(WeatherCategory.RAIN to rain)
         )
-        val selected = SoundSelector.selectSound(spec, isHoliday = true, weather = WeatherCategory.RAIN) {
+        val selected = SoundSelector.selectSound(spec, weather = WeatherCategory.RAIN) {
             Uri.parse("content://default")
         }
         assertEquals(holiday, selected)
@@ -54,7 +54,7 @@ class SoundSelectorTest {
         val spec = specBase().copy(
             soundMapping = mapOf(WeatherCategory.RAIN to rain)
         )
-        val selected = SoundSelector.selectSound(spec, isHoliday = false, weather = WeatherCategory.RAIN) {
+        val selected = SoundSelector.selectSound(spec, weather = WeatherCategory.RAIN) {
             Uri.parse("content://default")
         }
         assertEquals(rain, selected)
@@ -64,7 +64,7 @@ class SoundSelectorTest {
     fun selectSound_fallsBackToDefault_whenNoMatch() {
         val def = Uri.parse("content://default")
         val spec = specBase()
-        val selected = SoundSelector.selectSound(spec, isHoliday = false, weather = null) { def }
+        val selected = SoundSelector.selectSound(spec, weather = null) { def }
         assertEquals(def, selected)
     }
 }

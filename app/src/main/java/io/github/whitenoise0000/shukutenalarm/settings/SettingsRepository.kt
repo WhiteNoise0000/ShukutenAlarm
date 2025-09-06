@@ -1,4 +1,4 @@
-﻿package io.github.whitenoise0000.shukutenalarm.settings
+package io.github.whitenoise0000.shukutenalarm.settings
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 
 /**
- * 險ｭ螳夲ｼ育ｷｯ蠎ｦ/邨悟ｺｦ縲∫樟蝨ｨ蝨ｰ菴ｿ逕ｨ蜿ｯ蜷ｦ・峨ｒ DataStore 縺ｫ菫晏ｭ・蜿門ｾ励☆繧九Μ繝昴ず繝医Μ縲・ */
+ * 設定の読み書きや、現在地使用可否などを DataStore に保存/読み出しするリポジトリ。
+ */
 class SettingsRepository(private val context: Context) {
     private val latKey = doublePreferencesKey(PreferencesKeys.KEY_LAT)
     private val lonKey = doublePreferencesKey(PreferencesKeys.KEY_LON)
@@ -25,7 +26,7 @@ class SettingsRepository(private val context: Context) {
     private val holidayRefreshWifiOnlyKey = booleanPreferencesKey("holidayRefreshWifiOnly" )
     private val cityNameKey = stringPreferencesKey(PreferencesKeys.KEY_CITY_NAME)
 
-    /** 迴ｾ蝨ｨ縺ｮ險ｭ螳壹せ繝医Μ繝ｼ繝繧定ｿ斐☆縲・*/
+    /** 現在の設定のストリームを取得する。*/
     val settingsFlow: Flow<UserSettings> = context.appDataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { prefs ->
@@ -40,7 +41,7 @@ class SettingsRepository(private val context: Context) {
             )
         }
 
-    /** 險ｭ螳壹ｒ菫晏ｭ倥☆繧九・*/
+    /** 設定を保存する。*/
     suspend fun save(settings: UserSettings) {
         context.appDataStore.edit { prefs ->
             prefs[latKey] = settings.latitude
@@ -55,7 +56,8 @@ class SettingsRepository(private val context: Context) {
 }
 
 /**
- * 繝ｦ繝ｼ繧ｶ險ｭ螳壹・繝・・繧ｿ繧ｯ繝ｩ繧ｹ縲・ */
+ * ユーザー設定のデータクラス。
+ */
 data class UserSettings(
     val latitude: Double,
     val longitude: Double,
@@ -65,5 +67,3 @@ data class UserSettings(
     val holidayRefreshWifiOnly: Boolean = true,
     val cityName: String? = null
 )
-
-

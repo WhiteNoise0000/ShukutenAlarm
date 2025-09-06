@@ -60,6 +60,6 @@ object AppModule {
     /** WeatherRepository を提供（アプリケーションコンテキストに基づく）。 */
     @Provides
     @Singleton
-    fun provideWeatherRepository(@ApplicationContext context: Context, api: OpenMeteoApi, json: Json): WeatherRepository =
-        WeatherRepository(context, api, json)
+    fun provideWeatherRepository(@ApplicationContext context: Context, api: OpenMeteoApi): WeatherRepository =
+        WeatherRepository(context, api)
 }

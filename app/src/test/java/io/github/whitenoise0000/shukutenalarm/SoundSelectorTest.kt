@@ -37,7 +37,7 @@ class SoundSelectorTest {
     fun selectSound_holidayOverrides() {
         val holidayUri = Uri.parse("content://sound/holiday")
         val s = spec(HolidayPolicy.SAME, holiday = holidayUri)
-        val selected = SoundSelector.selectSound(s, isHoliday = true, weather = null) {
+        val selected = SoundSelector.selectSound(s, weather = null) {
             Uri.parse("content://default")
         }
         assertEquals(holidayUri, selected)
@@ -47,12 +47,12 @@ class SoundSelectorTest {
     fun selectSound_weatherMappingOrDefault() {
         val clear = Uri.parse("content://sound/clear")
         val s = spec(HolidayPolicy.SAME, mapping = mapOf(WeatherCategory.CLEAR to clear))
-        val fromWeather = SoundSelector.selectSound(s, isHoliday = false, weather = WeatherCategory.CLEAR) {
+        val fromWeather = SoundSelector.selectSound(s, weather = WeatherCategory.CLEAR) {
             Uri.parse("content://default")
         }
         assertEquals(clear, fromWeather)
 
-        val fallback = SoundSelector.selectSound(s, isHoliday = false, weather = WeatherCategory.RAIN) {
+        val fallback = SoundSelector.selectSound(s, weather = WeatherCategory.RAIN) {
             Uri.parse("content://default")
         }
         assertEquals(Uri.parse("content://default"), fallback)

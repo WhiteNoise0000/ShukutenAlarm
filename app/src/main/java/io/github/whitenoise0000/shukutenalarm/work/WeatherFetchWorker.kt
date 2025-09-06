@@ -60,10 +60,10 @@ class WeatherFetchWorker(
                 .addConverterFactory(json.asConverterFactory(contentType))
                 .build()
             val api = retrofit.create<OpenMeteoApi>()
-            val repo = WeatherRepository(applicationContext, api, json)
+            val repo = WeatherRepository(applicationContext, api)
             repo.prefetchToday(lat, lon)
             Result.success()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Result.retry()
         }
     }

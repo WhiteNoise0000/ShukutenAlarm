@@ -8,6 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalTime
+import androidx.core.net.toUri
 
 object AlarmSpecJson {
     fun encode(spec: AlarmSpec): String {
@@ -56,10 +57,10 @@ object AlarmSpecJson {
         while (names.hasNext()) {
             val name = names.next()
             val uri = if (mappingObj.isNull(name)) null else mappingObj.optString(name)
-            if (uri != null) mapping[WeatherCategory.valueOf(name)] = Uri.parse(uri)
+            if (uri != null) mapping[WeatherCategory.valueOf(name)] = uri.toUri()
         }
         val holidaySoundStr = if (obj.isNull("holidaySound")) null else obj.optString("holidaySound")
-        val holidaySound = holidaySoundStr?.let { Uri.parse(it) }
+        val holidaySound = holidaySoundStr?.toUri()
 
         return AlarmSpec(
             id = id,

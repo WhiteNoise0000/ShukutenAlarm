@@ -42,8 +42,8 @@ class WeatherMapperTest {
 
     @Test
     fun mapsThunderCodesToTHUNDER() {
-        // 95..99 は雷カテゴリ
-        assertEquals(WeatherCategory.THUNDER, WeatherMapper.fromWmo(95))
+        // 95..99 は雷ではなく雨カテゴリ
+        assertEquals(WeatherCategory.RAIN, WeatherMapper.fromWmo(95))
     }
 }
 

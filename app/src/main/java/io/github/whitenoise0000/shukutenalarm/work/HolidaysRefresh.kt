@@ -25,7 +25,7 @@ class HolidaysRefreshWorker(
         return@withContext try {
             HolidayRepository(applicationContext).forceRefresh()
             Result.success()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Result.retry()
         }
     }

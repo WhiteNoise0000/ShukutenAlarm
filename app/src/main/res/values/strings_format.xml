@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        音量スライダーのパーセント表示用フォーマット。
+        注意: % 記号は Android リソースでは %% としてエスケープする必要がある。
+    -->
+    <string name="volume_percent_format">%1$d%%</string>
+</resources>
+

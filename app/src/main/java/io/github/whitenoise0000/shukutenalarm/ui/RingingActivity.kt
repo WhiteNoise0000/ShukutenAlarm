@@ -1,8 +1,12 @@
 package io.github.whitenoise0000.shukutenalarm.ui
 
+import android.content.Context
+import android.media.AudioManager
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -31,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import io.github.whitenoise0000.shukutenalarm.R
@@ -55,7 +60,7 @@ class RingingActivity : ComponentActivity() {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 RingingScreen(
                     alarmId = intent.getIntExtra("id", -1),
-                    soundUri = intent.getStringExtra("soundUri")?.let { Uri.parse(it) },
+                    soundUri = intent.getStringExtra("soundUri")?.toUri(),
                     titleText = stringResource(R.string.text_ringing),
                     weatherLabel = intent.getStringExtra("weatherLabel").orEmpty(),
                     isHoliday = intent.getBooleanExtra("isHoliday", false),
@@ -88,6 +93,15 @@ private fun RingingScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // 音量・マナーモード制御用の AudioManager
+    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    // バイブレーション制御用の Vibrator
+    val vibrator = remember {
+        val vibratorManager =
+            context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vibratorManager.defaultVibrator
+    }
+
     // プレイヤー準備
     val player = remember {
         ExoPlayer.Builder(context).build().apply {
@@ -102,16 +116,33 @@ private fun RingingScreen(
                 false
             )
             setMediaItem(MediaItem.fromUri(uri))
-            val baseVol = if (volumeMode == VolumeMode.CUSTOM) (volumePercent / 100f) else 1f
+
+            // マナーモード/サイレントモードを踏襲するか判定
+            val isSilent = respectSilent && audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL
+            // 最終的な音量を決定（サイレント or 個別設定 or システム設定）
+            val baseVol = if (isSilent) 0f else if (volumeMode == VolumeMode.CUSTOM) (volumePercent / 100f) else 1f
             volume = baseVol
+
             playWhenReady = true
             prepare()
         }
     }
 
     DisposableEffect(Unit) {
+        // バイブレーションが有効な場合、パターンで鳴動開始
+        if (vibrate) {
+            val timings = longArrayOf(0, 500, 500) // 0.5秒ON, 0.5秒OFF
+            val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0)
+            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, 0)) // 繰り返し
+        }
+
+        // 画面破棄時にプレイヤーとバイブを停止
         onDispose {
-            runCatching { player.stop(); player.release() }
+            runCatching {
+                player.stop()
+                player.release()
+                vibrator.cancel()
+            }
         }
     }
 
@@ -129,13 +160,15 @@ private fun RingingScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(text = titleText, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            if (weatherLabel.isNotBlank()) {
+            // 天気ラベルは未取得でも明示的に表示して切り分けやすくする
+            run {
+                val label = weatherLabel.ifBlank { stringResource(R.string.text_unknown) }
                 Spacer(Modifier.height(8.dp))
-                Text(text = stringResource(R.string.label_weather_prefix, weatherLabel), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(text = stringResource(R.string.label_weather_prefix, label), color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
             if (isHoliday) {
                 Spacer(Modifier.height(4.dp))
-                Text(text = if (holidayName.isNotBlank()) holidayName else stringResource(R.string.label_today_holiday), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(text = holidayName.ifBlank { stringResource(R.string.label_today_holiday) }, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Spacer(Modifier.height(32.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -162,5 +195,3 @@ private fun RingingScreen(
         }
     }
 }
-
-

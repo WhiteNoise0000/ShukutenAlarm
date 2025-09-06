@@ -43,7 +43,8 @@ class WeatherCategoryMappingTest {
     @Test
     fun mapsThunderRange() {
         intArrayOf(95, 96, 99).forEach {
-            assertEquals(WeatherCategory.THUNDER, it.toCategory())
+            // 雷は雨扱い
+            assertEquals(WeatherCategory.RAIN, it.toCategory())
         }
     }
 

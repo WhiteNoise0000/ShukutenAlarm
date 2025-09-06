@@ -9,12 +9,12 @@
   - テスト: ユニット `app/src/test/`、計測 `app/src/androidTest/`。
 
 ## ビルド・実行・テスト
-- デバッグAPK: `./gradlew assembleDebug`（Windows: `gradlew.bat assembleDebug`）。
-- ユニットテスト: `./gradlew testDebugUnitTest`。
-- 計測テスト（端末/エミュレータ）: `./gradlew connectedAndroidTest`。
-- Lint: `./gradlew lint`。
-- 端末へインストール: `./gradlew installDebug`。
-Tip: 日常開発は Windows 上の Android Studio を使用し、CI 互換は Gradle で確認。ターミナルは PowerShell を利用。
+- デバッグAPK: `./gradlew assembleDebug`（Windows: `gradlew.bat assembleDebug`）
+- ユニットテスト: `./gradlew testDebugUnitTest`
+- 計測テスト（端末/エミュレータ）: `./gradlew connectedAndroidTest`
+- Lint: `./gradlew lint`
+- 端末へインストール: `./gradlew installDebug`
+- ファイル入出力にPowerShellを利用しないこと。BOM付UTF-8での処理により、文字化け発生の原因となる。
 
 ## コーディング規約・命名
 - 言語: Kotlin。インデント4スペース。公開APIにはKDoc。
@@ -41,4 +41,5 @@ Tip: 日常開発は Windows 上の Android Studio を使用し、CI 互換は G
 - 難読化/最適化は `app/proguard-rules.pro` を管理し、公開ビルドで検証。
 
 ## その他
+- SPEC.md／README.mdは適宜参照し、必要に応じて合わせて最新化すること。
 - 思考過程の表示およびプロンプト回答は日本語で行うこと。

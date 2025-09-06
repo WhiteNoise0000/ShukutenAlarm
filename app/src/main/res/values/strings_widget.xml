@@ -1,0 +1,8 @@
+<resources>
+    <!-- ウィジェット（次回表示/スキップ） -->
+    <string name="widget_next_alarm_title">次回アラーム</string>
+    <string name="widget_skip">スキップ</string>
+    <string name="widget_no_alarm">次回アラームなし</string>
+    <string name="toast_skip_done">次回アラームをスキップしました</string>
+    <string name="toast_no_alarm">スキップ対象のアラームがありません</string>
+</resources>

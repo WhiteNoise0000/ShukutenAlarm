@@ -50,7 +50,6 @@ class SoundSelectorTest {
     fun selectSound_usesHolidaySound_whenHoliday() {
         val uri = SoundSelector.selectSound(
             spec = spec(HolidayPolicy.SAME),
-            isHoliday = true,
             weather = WeatherCategory.RAIN,
             defaultUriProvider = { defUri }
         )
@@ -61,7 +60,6 @@ class SoundSelectorTest {
     fun selectSound_usesWeatherMapping_whenWeekday() {
         val uri = SoundSelector.selectSound(
             spec = spec(HolidayPolicy.SAME),
-            isHoliday = false,
             weather = WeatherCategory.RAIN,
             defaultUriProvider = { defUri }
         )
@@ -72,7 +70,6 @@ class SoundSelectorTest {
     fun selectSound_fallbacksToDefault_whenNoWeather() {
         val uri = SoundSelector.selectSound(
             spec = spec(HolidayPolicy.SAME),
-            isHoliday = false,
             weather = null,
             defaultUriProvider = { defUri }
         )

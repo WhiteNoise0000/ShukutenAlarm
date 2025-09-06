@@ -1,7 +1,3 @@
 <resources>
     <!-- Material3 ベースのアプリテーマ（夜間） -->
-    <style name="Theme.HolidayAlerm" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/black</item>
-    </style>
 </resources>

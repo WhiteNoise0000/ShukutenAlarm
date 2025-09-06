@@ -1,6 +1,6 @@
 # Androidアラーム×祝日×天気アプリ 仕様書（個人利用・非公開）v1.0
 
-最終更新: 2025-09-05 / Asia/Tokyo
+最終更新: 2025-09-06 / Asia/Tokyo
 
 ---
 
@@ -416,11 +416,53 @@ implementation("com.google.android.exoplayer:exoplayer:<latest>")
 
 ---
 
-## 24. 今後拡張（v1後）
+## 24. ホームウィジェット（実装）
 
-- ホーム画面ウィジェット、次回アラーム表示。
-- バックアップ/リストア（`DocumentFile` 経由でJSON書出し）。
-
+- 提供ウィジェット: 2x1「次回アラーム」ウィジェット（ホーム画面）。
+- 表示仕様:
+  - 時刻: 「H:mm」（大きめ/太字）。
+  - 日付: 「M/d(E)」。祝日の場合は末尾に「 [祝日]」を付与。
+  - タイトル: 「次回」。
+- 操作仕様:
+  - 本体タップ: アプリ起動（`MainActivity`）。
+  - タイトルタップ: ウィジェット内容を手動更新。
+  - 「スキップ」ボタン: 直近のアラームを1回だけスキップ（現在の登録をキャンセル → 設定に基づき次回以降を再スケジュール）。
+- ロジック整合:
+  - 次回候補計算は `NextAlarmCalculator` を使用（祝日ポリシー SKIP/DELAY/SAME、`holidayOnly`、`delayMinutes` に準拠）。
+  - スキップ動作は `ScheduleManager.cancel(id)` 後に `ScheduleManager.scheduleNext(spec)` で再登録。
+- デザイン:
+  - 角丸カード＋ダーク系グラデーション背景、半透明の角丸ボタン（モダン・シンプル）。
+  - RemoteViews ベース実装（Compose Glance 未採用）。
+- 更新ポリシー:
+  - `updatePeriodMillis=0`（自動更新なし）。ユーザー操作（スキップ/タイトルタップ）時に明示更新。
+  - 将来拡張: アラーム設定変更時や `AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED` 受信での更新を検討。
+- マニフェスト（抜粋）:
+  ```xml
+  <receiver
+      android:name=".widget.NextAlarmWidgetProvider"
+      android:exported="false">
+    <intent-filter>
+      <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+      android:name="android.appwidget.provider"
+      android:resource="@xml/next_alarm_widget_info" />
+  </receiver>
+  ```
+- メタデータ（`res/xml/next_alarm_widget_info.xml` 抜粋）:
+  ```xml
+  <appwidget-provider
+      android:minWidth="132dp"
+      android:minHeight="58dp"
+      android:updatePeriodMillis="0"
+      android:initialLayout="@layout/widget_next_alarm_2x1"
+      android:resizeMode="horizontal|vertical"
+      android:widgetCategory="home_screen" />
+  ```
 ---
+
+## 25. 今後拡張
+
+- バックアップ/リストア（`DocumentFile` 経由でJSON書出し）。
 
 以上。

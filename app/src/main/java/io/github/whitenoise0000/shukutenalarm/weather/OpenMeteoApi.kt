@@ -21,6 +21,8 @@ interface OpenMeteoApi {
 
 /**
  * 最低限のレスポンスモデル（天気コードと降水確率）。
+ * Open‑Meteo の JMA モデルでは、変数未提供の時間帯が `null` になることがあるため、
+ * 配列の要素およびプロパティ自体を null 許容にしてデコード失敗を防ぐ。
  */
 @Serializable
 data class JmaResponse(
@@ -29,8 +31,11 @@ data class JmaResponse(
 
 @Serializable
 data class Hourly(
+    // 時刻は常に提供される想定だが安全のためデフォルトを持つ
     @SerialName("time") val time: List<String> = emptyList(),
-    @SerialName("weathercode") val weathercode: List<Int> = emptyList(),
-    @SerialName("precipitation_probability") val precipitationProbability: List<Int> = emptyList()
+    // 要素が null のケースやプロパティ自体が欠落/ null のケースに対応
+    @SerialName("weathercode") val weathercode: List<Int?>? = emptyList(),
+    // アプリでは未使用だが、JMA では未対応で null が入ることがあるため同様に許容
+    @SerialName("precipitation_probability") val precipitationProbability: List<Int?>? = emptyList()
 )
 

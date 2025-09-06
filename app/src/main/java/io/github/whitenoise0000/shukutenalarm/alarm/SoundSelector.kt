@@ -26,7 +26,6 @@ object SoundSelector {
      */
     fun selectSound(
         spec: AlarmSpec,
-        isHoliday: Boolean,
         weather: WeatherCategory?,
         defaultUriProvider: () -> Uri
     ): Uri {

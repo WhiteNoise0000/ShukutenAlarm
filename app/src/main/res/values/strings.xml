@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">HolidayAlerm</string>
+    <string name="app_name">祝天アラーム</string>
 
     <!-- タイトル/ラベル -->
     <string name="title_alarm_list">アラーム一覧</string>
@@ -16,9 +16,7 @@
     <string name="label_volume">音量</string>
     <string name="label_vibrate">バイブレーション</string>
     <string name="label_respect_silent">マナー/サイレントに従う</string>
-    <string name="label_holiday_sound">祝日サウンド</string>
     <string name="label_enabled_toggle">有効</string>
-    <string name="label_pick_time_format">時刻を選択（%1$s）</string>
     <string name="label_holiday_only">祝日のみ鳴動</string>
     <string name="label_delay_minutes_holiday">祝日DELAY（分）</string>
     <string name="label_holiday_refresh_monthly">月1回自動で更新</string>
@@ -43,6 +41,8 @@
     <string name="action_searching">検索中…</string>
     <string name="action_select">選択</string>
     <string name="action_detect_current_location">現在地を取得</string>
+    <string name="action_fetch_weather_now">今すぐ天気を取得</string>
+    <string name="action_fetching_weather">取得中…</string>
 
     <!-- 設定/現在地・天気 -->
     <string name="hint_city_search">都市名で検索（例: 東京, Osaka）</string>
@@ -59,6 +59,8 @@
     <string name="action_refresh_now">今すぐ更新</string>
     <string name="action_refreshing">更新中…</string>
     <string name="text_refreshed">更新しました</string>
+    <string name="toast_weather_fetched">天気を取得しました: %1$s</string>
+    <string name="error_weather_fetch_failed">天気の取得に失敗しました</string>
     <string name="error_refresh_failed">更新に失敗しました</string>
 
     <!-- ポリシー -->
@@ -71,8 +73,6 @@
     <string name="volume_mode_custom">個別設定</string>
 
     <!-- ステータス/メッセージ -->
-    <string name="text_unset">未設定</string>
-    <string name="text_set">設定済み</string>
     <string name="text_device_default">端末デフォルト</string>
     <string name="text_unknown">不明</string>
     <string name="text_ringing">アラーム鳴動中</string>
@@ -101,7 +101,6 @@
     <string name="weather_cloudy">くもり</string>
     <string name="weather_rain">雨</string>
     <string name="weather_snow">雪</string>
-    <string name="weather_thunder">雷</string>
 
     <!-- ポリシー説明 -->
     <string name="hint_policy_same">祝日も平日と同様に鳴動します</string>
@@ -110,9 +109,7 @@
     <string name="hint_holiday_only_days_ignored">祝日のみが対象のため、曜日設定は無視されます</string>
     <string name="hint_respect_silent">注意: マナーやサイレント中は鳴らない場合があります（端末設定・USAGE_ALARMの挙動に依存）</string>
     <string name="text_inherit_default">デフォルト適用</string>
-    <string name="label_preview">プレビュー</string>
     <string name="label_selected_city">選択中の都市: %1$s</string>
-    <string name="label_disabled">無効</string>
 
     <!-- トースト -->
     <string name="toast_alarm_saved">アラームを保存しました</string>
@@ -122,7 +119,14 @@
     <string name="toast_settings_saved">設定を保存しました</string>
     <string name="toast_holidays_refreshed">祝日データを更新しました</string>
     <string name="toast_city_selected">都市を選択しました</string>
+
+    <!-- スキップ状態表示（一覧） -->
+    <string name="label_skip_until_format">スキップ中: %1$s</string>
+    <string name="action_clear_skip">解除</string>
+    <string name="toast_skip_cleared">スキップを解除しました</string>
+    <string name="label_holiday">祝</string>
 </resources>
+
 
 
 
