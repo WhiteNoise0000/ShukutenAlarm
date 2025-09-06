@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
  * - それ以外では標準のライト/ダーク配色にフォールバックする。
  */
 @Composable
-fun HolidayAlermTheme(
+fun ShukutenAlarmTheme(
     useDarkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit

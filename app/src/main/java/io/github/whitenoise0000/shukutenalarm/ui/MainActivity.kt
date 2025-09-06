@@ -118,7 +118,7 @@ import io.github.whitenoise0000.shukutenalarm.data.model.HolidayPolicy
 import io.github.whitenoise0000.shukutenalarm.data.model.VolumeMode
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
-import io.github.whitenoise0000.shukutenalarm.ui.theme.HolidayAlermTheme
+import io.github.whitenoise0000.shukutenalarm.ui.theme.ShukutenAlarmTheme
 import io.github.whitenoise0000.shukutenalarm.weather.GeoPlace
 import io.github.whitenoise0000.shukutenalarm.weather.GeocodingRepository
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             // アプリ共通の Material3 テーマ
-            HolidayAlermTheme {
+            ShukutenAlarmTheme {
                 AppRoot()
             }
         }
@@ -611,11 +611,11 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
                         val current = holidaySound.value
                         IconButton(onClick = {
                             onPicked.value = { picked -> holidaySound.value = picked }
-                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
                                 putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
                                 putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
                                 putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, current)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, current ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
                             }
                             picker.launch(intent)
                         }) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.action_edit)) }
@@ -673,8 +673,11 @@ private fun EditAlarmScreenModern(alarmId: Int?, onDone: () -> Unit, registerSav
                                             putExtra("isHoliday", false)
                                             putExtra("holidayName", "")
                                                                                         putExtra("holidayName", "")
-                                            putExtra("alarmName", nameState.value)
-                                            putExtra("volume", if (volumeModeState.value == VolumeMode.CUSTOM) (volumePercentState.floatValue / 100f) else 1f)
+                                                                                        putExtra("alarmName", nameState.value)
+                                            putExtra("volumeMode", volumeModeState.value.name)
+                                            putExtra("volumePercent", volumePercentState.floatValue.toInt())
+                                            putExtra("vibrate", vibrateState.value)
+                                            putExtra("respectSilent", respectSilentState.value)
                                         }
                                         ContextCompat.startActivity(ctx, intent, null)
                                     }) { Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.action_preview)) }
@@ -1344,10 +1347,12 @@ private fun ringtoneTitle(context: Context, uri: Uri): String =
         .getOrNull() ?: context.getString(R.string.text_unknown)
 
 private fun getLastKnownCoarse(context: Context): Location? {
-    val lm = context.getSystemService(LocationManager::class.java) ?: return null
+        val lm = context.getSystemService(LocationManager::class.java) ?: return null
     val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER, LocationManager.GPS_PROVIDER)
     for (p in providers) {
-        runCatching { lm.getLastKnownLocation(p) }.getOrNull()?.let { return it }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            runCatching { lm.getLastKnownLocation(p) }.getOrNull()?.let { return it }
+        }
     }
     return null
 }
