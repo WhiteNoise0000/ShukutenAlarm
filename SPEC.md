@@ -388,7 +388,9 @@ kapt("com.google.dagger:hilt-compiler:<latest>")
 implementation("com.squareup.retrofit2:retrofit:<latest>")
 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:<latest>")
 implementation("com.squareup.okhttp3:logging-interceptor:<latest>")
-implementation("com.google.android.exoplayer:exoplayer:<latest>")
+implementation("androidx.media3:media3-exoplayer:<latest>")
+implementation("androidx.media3:media3-ui:<latest>")
+implementation("androidx.media3:media3-session:<latest>")
 ```
 
 ### ビルド条件
@@ -421,8 +423,8 @@ implementation("com.google.android.exoplayer:exoplayer:<latest>")
 - 提供ウィジェット: 2x1「次回アラーム」ウィジェット（ホーム画面）。
 - 表示仕様:
   - 時刻: 「H:mm」（大きめ/太字）。
-  - 日付: 「M/d(E)」。祝日の場合は末尾に「 [祝日]」を付与。
-  - タイトル: 「次回」。
+  - 日付: 「M/d(E)」。祝日の場合は末尾に「 [祝]」を付与。
+  - タイトル: 「次回アラーム」。
 - 操作仕様:
   - 本体タップ: アプリ起動（`MainActivity`）。
   - タイトルタップ: ウィジェット内容を手動更新。

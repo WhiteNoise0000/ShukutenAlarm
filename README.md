@@ -25,7 +25,7 @@
 *   **Data Persistence:** [Jetpack DataStore](https://developer.android.com/topic/libraries/architecture/datastore)
 *   **Navigation:** [Navigation-Compose](https://developer.android.com/jetpack/compose/navigation)
 *   **Networking:** [Retrofit2](https://square.github.io/retrofit/), [OkHttp3](https://square.github.io/okhttp/), [Kotlinx.Serialization](https://github.com/Kotlin/kotlinx.serialization)
-*   **Media:** [ExoPlayer](https://developer.android.com/guide/topics/media/exoplayer)
+*   **Media:** [Media3](https://developer.android.com/guide/topics/media/media3)
 
 ## 🚀 ビルド方法
 
