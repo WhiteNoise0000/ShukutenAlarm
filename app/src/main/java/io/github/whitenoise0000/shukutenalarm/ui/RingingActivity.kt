@@ -9,6 +9,7 @@ import android.os.VibrationEffect
 import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import java.time.LocalDateTime
  * - 現在の天気ラベル/祝日ラベルを簡潔に表示する。
  */
 class RingingActivity : ComponentActivity() {
+    @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -67,10 +69,14 @@ class RingingActivity : ComponentActivity() {
                     titleText = stringResource(R.string.text_ringing),
                     weatherLabel = intent.getStringExtra("weatherLabel").orEmpty(),
                     isHoliday = intent.getBooleanExtra("isHoliday", false),
-                                        holidayName = intent.getStringExtra("holidayName").orEmpty(),
+                    holidayName = intent.getStringExtra("holidayName").orEmpty(),
                     alarmName = intent.getStringExtra("alarmName").orEmpty(),
-                    volumeMode = runCatching { VolumeMode.valueOf(intent.getStringExtra("volumeMode") ?: VolumeMode.SYSTEM.name) }.getOrDefault(VolumeMode.SYSTEM),
-                    volumePercent = intent.getIntExtra("volumePercent", 100).coerceIn(0,100),
+                    volumeMode = runCatching {
+                        VolumeMode.valueOf(
+                            intent.getStringExtra("volumeMode") ?: VolumeMode.SYSTEM.name
+                        )
+                    }.getOrDefault(VolumeMode.SYSTEM),
+                    volumePercent = intent.getIntExtra("volumePercent", 100).coerceIn(0, 100),
                     vibrate = intent.getBooleanExtra("vibrate", false),
                     respectSilent = intent.getBooleanExtra("respectSilent", true),
                     onFinished = { finish() }
@@ -88,7 +94,7 @@ private fun RingingScreen(
     titleText: String,
     weatherLabel: String,
     isHoliday: Boolean,
-        holidayName: String,
+    holidayName: String,
     alarmName: String,
     volumeMode: VolumeMode,
     volumePercent: Int,
@@ -124,9 +130,11 @@ private fun RingingScreen(
             setMediaItem(MediaItem.fromUri(uri))
 
             // マナーモード/サイレントモードを踏襲するか判定
-            val isSilent = respectSilent && audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL
+            val isSilent =
+                respectSilent && audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL
             // 最終的な音量を決定（サイレント or 個別設定 or システム設定）
-            val baseVol = if (isSilent) 0f else if (volumeMode == VolumeMode.CUSTOM) (volumePercent / 100f) else 1f
+            val baseVol =
+                if (isSilent) 0f else if (volumeMode == VolumeMode.CUSTOM) (volumePercent / 100f) else 1f
             volume = baseVol
 
             playWhenReady = true
@@ -159,26 +167,45 @@ private fun RingingScreen(
 
     val snoozeMinutes = integerResource(id = R.integer.snooze_minutes_default)
 
-    Surface(modifier = Modifier.fillMaxSize().background(gradient)) {
+    Surface(modifier = Modifier
+        .fillMaxSize()
+        .background(gradient)) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(text = titleText, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(
+                text = titleText,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
             if (alarmName.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(text = alarmName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(
+                    text = alarmName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
             // 天気ラベルは未取得でも明示的に表示して切り分けやすくする
             run {
                 val label = weatherLabel.ifBlank { stringResource(R.string.text_unknown) }
                 Spacer(Modifier.height(8.dp))
-                Text(text = stringResource(R.string.label_weather_prefix, label), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(
+                    text = stringResource(R.string.label_weather_prefix, label),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
             if (isHoliday) {
                 Spacer(Modifier.height(4.dp))
-                Text(text = holidayName.ifBlank { stringResource(R.string.label_today_holiday) }, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(
+                    text = holidayName.ifBlank { stringResource(R.string.label_today_holiday) },
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
             Spacer(Modifier.height(32.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -191,7 +218,10 @@ private fun RingingScreen(
                         val spec: AlarmSpec? = withContext(Dispatchers.IO) { repo.load(alarmId) }
                         spec?.let {
                             val at = LocalDateTime.now().plusMinutes(snoozeMinutes.toLong())
-                            AlarmGateway(context).scheduleExactAlarm(it.copy(time = at.toLocalTime()), at.toLocalDate())
+                            AlarmGateway(context).scheduleExactAlarm(
+                                it.copy(time = at.toLocalTime()),
+                                at.toLocalDate()
+                            )
                         }
                         onFinished()
                     }
