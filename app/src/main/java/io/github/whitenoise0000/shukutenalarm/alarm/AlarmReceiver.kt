@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -81,6 +82,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         SoundSelector.selectSound(spec, weather) {
                             android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
                                 ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                                ?: Settings.System.DEFAULT_ALARM_ALERT_URI
                         }.toString()
                     )
                     // 天気ラベルはユーザ向けにローカライズした文字列を渡す

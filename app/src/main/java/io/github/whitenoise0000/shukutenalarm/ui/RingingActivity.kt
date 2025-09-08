@@ -1,12 +1,15 @@
 package io.github.whitenoise0000.shukutenalarm.ui
 
+import android.content.ContentResolver
 import android.content.Context
 import android.media.AudioManager
+import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.VibratorManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
@@ -31,13 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.integerResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -51,6 +54,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
+import android.media.AudioAttributes as SysAudioAttributes
+import androidx.media3.common.AudioAttributes as ExoAudioAttributes
 
 /**
  * 鳴動画面（フルスクリーン）。
@@ -62,10 +67,9 @@ class RingingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ロック画面での表示と画面点灯を強制
+        // ロック画面での表示と画面点灯を有効化
         setShowWhenLocked(true)
         setTurnScreenOn(true)
-        // 画面を常にオンに保つ
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
@@ -93,7 +97,7 @@ class RingingActivity : ComponentActivity() {
     }
 }
 
-@UnstableApi
+@OptIn(UnstableApi::class)
 @Composable
 private fun RingingScreen(
     alarmId: Int,
@@ -109,64 +113,102 @@ private fun RingingScreen(
     respectSilent: Boolean,
     onFinished: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // 音量・マナーモード制御用の AudioManager
+    // AudioManager / Vibrator
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
-    // バイブレーション制御用の Vibrator
     val vibrator = remember {
-        val vibratorManager =
-            context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-        vibratorManager.defaultVibrator
+        val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vm.defaultVibrator
     }
 
-    // プレイヤー準備
-    val player = remember {
-        ExoPlayer.Builder(context).build().apply {
+    // --- どのプレイヤーを使うか判定（Ringtone専用URIはRingtoneで再生） ---
+    val useRingtoneApi = remember(soundUri) {
+        shouldUseRingtone(soundUri)
+    }
+
+    // --- Ringtone 準備（デフォルト/設定URI向け） ---
+    val ringtonePlayer: Ringtone? = remember(soundUri, useRingtoneApi) {
+        if (useRingtoneApi) {
             val uri = soundUri
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_ALARM)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                false
-            )
-            setMediaItem(MediaItem.fromUri(uri))
+                ?: Settings.System.DEFAULT_ALARM_ALERT_URI
 
-            // マナーモード/サイレントモードを踏襲するか判定
-            val isSilent =
-                respectSilent && audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL
-            // 最終的な音量を決定（サイレント or 個別設定 or システム設定）
-            val baseVol =
-                if (isSilent) 0f else if (volumeMode == VolumeMode.CUSTOM) (volumePercent / 100f) else 1f
-            volume = baseVol
-
-            playWhenReady = true
-            prepare()
-        }
-    }
-
-    DisposableEffect(Unit) {
-        // バイブレーションが有効な場合、パターンで鳴動開始
-        if (vibrate) {
-            val timings = longArrayOf(0, 500, 500) // 0.5秒ON, 0.5秒OFF
-            val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0)
-            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, 0)) // 繰り返し
-        }
-
-        // 画面破棄時にプレイヤーとバイブを停止
-        onDispose {
-            runCatching {
-                player.stop()
-                player.release()
-                vibrator.cancel()
+            RingtoneManager.getRingtone(context, uri)?.apply {
+                audioAttributes = SysAudioAttributes.Builder()
+                    .setUsage(SysAudioAttributes.USAGE_ALARM)
+                    .setContentType(SysAudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+                isLooping = true
             }
+        } else null
+    }
+
+    // --- ExoPlayer 準備（raw資源やMediaStore等の一般URI向け） ---
+    val exoPlayer: ExoPlayer? = remember(soundUri, useRingtoneApi) {
+        if (!useRingtoneApi && soundUri != null) {
+            ExoPlayer.Builder(context).build().apply {
+                setAudioAttributes(
+                    ExoAudioAttributes.Builder()
+                        .setUsage(C.USAGE_ALARM)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(),
+                    /* handleAudioFocus = */ true
+                )
+                setMediaItem(MediaItem.fromUri(soundUri))
+                prepare()
+                playWhenReady = true
+            }
+        } else null
+    }
+
+    // 再生とクリーンアップ
+    DisposableEffect(ringtonePlayer, exoPlayer, volumeMode, volumePercent, respectSilent) {
+        val isSilent = respectSilent && audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL
+        val targetVolume = when {
+            isSilent -> 0f
+            volumeMode == VolumeMode.CUSTOM -> (volumePercent / 100f)
+            else -> 1f
+        }
+
+        // Ringtone は個別音量設定がないので STREAM_ALARM の音量を一時変更
+        val originalAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+        val maxAlarmVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        val newAlarmVolume = (targetVolume * maxAlarmVolume).toInt().coerceIn(0, maxAlarmVolume)
+
+        // 再生開始
+        if (ringtonePlayer != null) {
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, newAlarmVolume, 0)
+            if (!isSilent) ringtonePlayer.play() else ringtonePlayer.stop()
+        } else if (exoPlayer != null) {
+            exoPlayer.volume = targetVolume
+            if (!isSilent) exoPlayer.play() else exoPlayer.pause()
+        }
+
+        // バイブレーション
+        if (vibrate) {
+            val timings = longArrayOf(0, 500, 500) // 0.5秒ON→0.5秒OFF
+            val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0)
+            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, 0))
+        }
+
+        onDispose {
+            try {
+                ringtonePlayer?.stop()
+            } catch (_: Throwable) { }
+            try {
+                exoPlayer?.stop()
+                exoPlayer?.release()
+            } catch (_: Throwable) { }
+            vibrator.cancel()
+            // 音量を元へ
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalAlarmVolume, 0)
         }
     }
 
+    // ===== UI =====
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
     val gradient = remember(primaryContainer) {
         Brush.verticalGradient(listOf(primaryContainer, Color.Black))
@@ -174,9 +216,11 @@ private fun RingingScreen(
 
     val snoozeMinutes = integerResource(id = R.integer.snooze_minutes_default)
 
-    Surface(modifier = Modifier
-        .fillMaxSize()
-        .background(gradient)) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradient)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -198,7 +242,6 @@ private fun RingingScreen(
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-            // 天気ラベルは未取得でも明示的に表示して切り分けやすくする
             run {
                 val label = weatherLabel.ifBlank { stringResource(R.string.text_unknown) }
                 Spacer(Modifier.height(8.dp))
@@ -218,8 +261,10 @@ private fun RingingScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(onClick = {
                     // スヌーズ
-                    player.stop()
+                    try { ringtonePlayer?.stop() } catch (_: Throwable) {}
+                    try { exoPlayer?.stop() } catch (_: Throwable) {}
                     if (alarmId > 0) NotificationManagerCompat.from(context).cancel(alarmId)
+
                     scope.launch {
                         val repo = DataStoreAlarmRepository(context)
                         val spec: AlarmSpec? = withContext(Dispatchers.IO) { repo.load(alarmId) }
@@ -233,12 +278,31 @@ private fun RingingScreen(
                         onFinished()
                     }
                 }) { Text(stringResource(R.string.action_snooze)) }
+
                 Button(onClick = {
-                    player.stop()
+                    try { ringtonePlayer?.stop() } catch (_: Throwable) {}
+                    try { exoPlayer?.stop() } catch (_: Throwable) {}
                     if (alarmId > 0) NotificationManagerCompat.from(context).cancel(alarmId)
                     onFinished()
                 }) { Text(stringResource(R.string.action_stop)) }
             }
         }
     }
+}
+
+/**
+ * Ringtone専用URIかどうかを判定。
+ * - null（＝デフォルト）や「デフォルト着信音の象徴URI」
+ * - content://settings/...（Settings.AUTHORITY）
+ * は Ringtone でのみ再生可能。
+ */
+private fun shouldUseRingtone(uri: Uri?): Boolean {
+    if (uri == null) return true
+    // デフォルト着信音等の象徴URIか？
+    if (RingtoneManager.isDefault(uri)) return true
+    // Settingsプロバイダ配下（content://settings/...）
+    if (uri.scheme == ContentResolver.SCHEME_CONTENT && uri.authority == Settings.AUTHORITY) {
+        return true
+    }
+    return false
 }
