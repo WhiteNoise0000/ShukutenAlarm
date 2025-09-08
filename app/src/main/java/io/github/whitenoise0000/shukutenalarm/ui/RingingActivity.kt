@@ -61,6 +61,13 @@ class RingingActivity : ComponentActivity() {
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ロック画面での表示と画面点灯を強制
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+        // 画面を常にオンに保つ
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         setContent {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 RingingScreen(

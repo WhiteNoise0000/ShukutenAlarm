@@ -74,7 +74,7 @@
 
     <!-- ステータス/メッセージ -->
     <string name="text_device_default">端末デフォルト</string>
-    <string name="text_unknown">不明</string>
+    <string name="text_unknown">天気情報が取得できませんでした</string>
     <string name="text_ringing">アラーム鳴動中</string>
     <string name="empty_alarms_title">アラームがありません</string>
     <string name="empty_alarms_message">＋ ボタンでアラームを追加してください</string>
