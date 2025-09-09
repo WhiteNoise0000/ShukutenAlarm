@@ -1,17 +1,23 @@
 package io.github.whitenoise0000.shukutenalarm.alarm
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.RequiresPermission
 import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
 import io.github.whitenoise0000.shukutenalarm.ui.RingingActivity
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
-/**\n * AlarmManager を用いて正確なアラームを登録するゲートウェイ。\n * Doze 中でも確実に鳴動させるため setAlarmClock を使用。\n */
+/**
+ * AlarmManager を用いて正確なアラームを登録するゲートウェイ。
+ * Doze 中でも確実に鳴動させるため setAlarmClock を使用。
+ */
 class AlarmGateway(private val context: Context) {
+    @RequiresPermission(Manifest.permission.SCHEDULE_EXACT_ALARM)
     fun scheduleExactAlarm(spec: AlarmSpec, date: LocalDate) {
         val trigger = ZonedDateTime.of(date, spec.time, ZoneId.systemDefault())
             .toInstant().toEpochMilli()
