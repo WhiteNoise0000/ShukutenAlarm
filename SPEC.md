@@ -30,7 +30,7 @@
 
 ## 2. ターゲット/互換
 
-- 対象OS: Android 13+（minSdk=33）、target/compileSdk は最新に追随。
+- 対象OS: Android 14+（minSdk=34）、target/compileSdk は最新に追随。
 - 端末: Pixel 6 以降で検証（他端末はベストエフォート）。
 
 ---

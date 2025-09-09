@@ -1,10 +1,13 @@
 package io.github.whitenoise0000.shukutenalarm.alarm
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.RingtoneManager
+import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -65,23 +68,33 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (!SoundSelector.shouldRing(spec, isHolidayToday)) {
                     ScheduleManager(context).scheduleNext(spec)
                     // ウィジェットへ更新通知（次回が変わる可能性があるため）
-                    context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
+                    context.sendBroadcast(
+                        Intent(
+                            context,
+                            NextAlarmWidgetProvider::class.java
+                        ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
+                    )
                     return@launch
                 }
 
                 // キャッシュされた天気 → 未取得なら最大10秒で再取得
                 val cached = readCachedWeather(context)
-                val weather = cached ?: runCatching { fetchWeatherWithTimeout(context, timeoutMillis = 10_000) }.getOrNull()
+                val weather = cached ?: runCatching {
+                    fetchWeatherWithTimeout(
+                        context,
+                        timeoutMillis = 10_000
+                    )
+                }.getOrNull()
 
                 // 鳴動画面へ渡す情報
                 val activityIntent = Intent(context, RingingActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
                     putExtra("id", id)
                     putExtra(
                         "soundUri",
                         SoundSelector.selectSound(spec, weather) {
-                            android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
-                                ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                                 ?: Settings.System.DEFAULT_ALARM_ALERT_URI
                         }.toString()
                     )
@@ -96,19 +109,31 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("alarmName", spec.name)
                 }
 
-                // 通知権限があればフルスクリーン通知、なければ直接起動
-                val hasPost =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                if (hasPost) {
+                val canFsi = context.getSystemService(NotificationManager::class.java)
+                    ?.canUseFullScreenIntent() == true
+                val hasPost = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+                if (canFsi && hasPost) {
+                    // ★ 常にFSIで鳴動させる（通知チャンネル: IMPORTANCE_HIGH, CATEGORY_ALARM 必須）
                     Notifications.showAlarmFullScreen(context, id, activityIntent)
                 } else {
-                    ContextCompat.startActivity(context, activityIntent, null)
+                    // ユーザーがFSIを無効化しているケース → 設定へ誘導
+                    Notifications.openFullScreenIntentSettings(context)
+                    // FSI無効の場合は通常通知に格下げされる
+                    Notifications.showAlarmFullScreen(context, id, activityIntent)
                 }
+
 
                 // 次回をスケジュール
                 ScheduleManager(context).scheduleNext(spec)
                 // ウィジェットへ更新通知
-                context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
+                context.sendBroadcast(
+                    Intent(
+                        context,
+                        NextAlarmWidgetProvider::class.java
+                    ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
+                )
             } finally {
                 pending.finish()
             }
@@ -134,11 +159,17 @@ class AlarmReceiver : BroadcastReceiver() {
      * - 成功時は DataStore にキャッシュ保存（WeatherRepository.prefetchToday）。
      * - 失敗・タイムアウト時は null。
      */
-    private suspend fun fetchWeatherWithTimeout(context: Context, timeoutMillis: Long): WeatherCategory? = withTimeout(timeoutMillis) {
+    private suspend fun fetchWeatherWithTimeout(
+        context: Context,
+        timeoutMillis: Long
+    ): WeatherCategory? = withTimeout(timeoutMillis) {
         withContext(Dispatchers.IO) {
             val settings = SettingsRepository(context).settingsFlow.first()
             val (lat, lon) = if (settings.useCurrentLocation) {
-                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                val granted = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
                 if (granted) {
                     val lm = context.getSystemService(android.location.LocationManager::class.java)
                     val providers = listOf(
@@ -149,7 +180,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     var out = settings.latitude to settings.longitude
                     providers.forEach { p ->
                         val loc = runCatching { lm?.getLastKnownLocation(p) }.getOrNull()
-                        if (loc != null) { out = loc.latitude to loc.longitude; return@forEach }
+                        if (loc != null) {
+                            out = loc.latitude to loc.longitude; return@forEach
+                        }
                     }
                     out
                 } else settings.latitude to settings.longitude
@@ -157,7 +190,9 @@ class AlarmReceiver : BroadcastReceiver() {
 
             val json = Json { ignoreUnknownKeys = true }
             val client = OkHttpClient.Builder()
-                .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+                .addInterceptor(HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BASIC
+                })
                 .build()
             val retrofit = Retrofit.Builder()
                 .baseUrl("https://api.open-meteo.com/")
