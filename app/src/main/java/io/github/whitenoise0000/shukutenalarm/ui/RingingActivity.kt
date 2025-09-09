@@ -1,5 +1,6 @@
 package io.github.whitenoise0000.shukutenalarm.ui
 
+import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.Context
 import android.media.AudioManager
@@ -10,6 +11,7 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
@@ -78,7 +80,9 @@ class RingingActivity : ComponentActivity() {
                     alarmId = intent.getIntExtra("id", -1),
                     soundUri = intent.getStringExtra("soundUri")?.toUri(),
                     titleText = stringResource(R.string.text_ringing),
-                    weatherLabel = intent.getStringExtra("weatherLabel").orEmpty(),
+                    weatherLabel = intent.getStringExtra("weatherLabel").orEmpty().also {
+                        Log.d("RingingActivity", "Received weatherLabel: $it")
+                    },
                     isHoliday = intent.getBooleanExtra("isHoliday", false),
                     holidayName = intent.getStringExtra("holidayName").orEmpty(),
                     alarmName = intent.getStringExtra("alarmName").orEmpty(),
@@ -97,6 +101,7 @@ class RingingActivity : ComponentActivity() {
     }
 }
 
+@SuppressLint("MissingPermission")
 @OptIn(UnstableApi::class)
 @Composable
 private fun RingingScreen(

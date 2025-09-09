@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.RingtoneManager
+import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -38,6 +39,9 @@ import org.json.JSONObject
 import retrofit2.Retrofit
 import retrofit2.create
 import java.time.LocalDate
+import android.util.Log
+import io.github.whitenoise0000.shukutenalarm.ui.getLabel
+import androidx.core.net.toUri
 
 /**
  * アラーム発火時の BroadcastReceiver。
@@ -78,16 +82,21 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 // キャッシュされた天気 → 未取得なら最大10秒で再取得
                 val cached = readCachedWeather(context)
+                Log.d("AlarmReceiver", "Cached weather: $cached")
                 val weather = cached ?: runCatching {
+                    Log.d("AlarmReceiver", "Attempting to fetch weather with timeout...")
                     fetchWeatherWithTimeout(
                         context,
                         timeoutMillis = 10_000
                     )
                 }.getOrNull()
+                Log.d("AlarmReceiver", "Final weather after fetch attempt: $weather")
 
                 // 鳴動画面へ渡す情報
                 val activityIntent = Intent(context, RingingActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
+                    // Intent にユニークな Data URI を設定して、PendingIntent のエクストラが確実に更新されるようにする
+                    data = "intent://${context.packageName}/alarm/$id/${System.currentTimeMillis()}".toUri()
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
                     putExtra("id", id)
                     putExtra(
                         "soundUri",
@@ -98,7 +107,9 @@ class AlarmReceiver : BroadcastReceiver() {
                         }.toString()
                     )
                     // 天気ラベルはユーザ向けにローカライズした文字列を渡す
-                    putExtra("weatherLabel", weather?.let { toWeatherLabel(context, it) } ?: "")
+                    val weatherLabel = weather?.getLabel(context) ?: ""
+                    Log.d("AlarmReceiver", "Weather label being put into intent: $weatherLabel")
+                    putExtra("weatherLabel", weatherLabel)
                     putExtra("isHoliday", isHolidayToday)
                     putExtra("holidayName", holidayName ?: "")
                     putExtra("volumeMode", spec.volumeMode.name)
@@ -146,8 +157,14 @@ class AlarmReceiver : BroadcastReceiver() {
         text?.let {
             runCatching {
                 val obj = JSONObject(it)
-                val cat = obj.optString("category", "").ifBlank { return@runCatching null }
-                WeatherCategory.valueOf(cat)
+                val cat = obj.optString("category", "").ifBlank {
+                    Log.d("AlarmReceiver", "readCachedWeather: category is blank.")
+                    return@runCatching null
+                }
+                Log.d("AlarmReceiver", "readCachedWeather: category string = $cat")
+                val weatherCategory = WeatherCategory.valueOf(cat)
+                Log.d("AlarmReceiver", "readCachedWeather: parsed WeatherCategory = $weatherCategory")
+                weatherCategory
             }.getOrNull()
         }
     }
@@ -162,7 +179,8 @@ class AlarmReceiver : BroadcastReceiver() {
         context: Context,
         timeoutMillis: Long
     ): WeatherCategory? = withTimeout(timeoutMillis) {
-        withContext(Dispatchers.IO) {
+        Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Entering withTimeout block.")
+        val result = withContext(Dispatchers.IO) {
             val settings = SettingsRepository(context).settingsFlow.first()
             val (lat, lon) = if (settings.useCurrentLocation) {
                 val granted = ContextCompat.checkSelfPermission(
@@ -200,15 +218,11 @@ class AlarmReceiver : BroadcastReceiver() {
                 .build()
             val api = retrofit.create<OpenMeteoApi>()
             val repo = WeatherRepository(context, api)
-            repo.prefetchToday(lat, lon)
+            val fetchedCategory = repo.prefetchToday(lat, lon)
+            Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Fetched category = $fetchedCategory")
+            fetchedCategory
         }
-    }
-
-    /** WeatherCategory をローカライズ済みのラベルに変換する。*/
-    private fun toWeatherLabel(context: Context, cat: WeatherCategory): String = when (cat) {
-        WeatherCategory.CLEAR -> context.getString(io.github.whitenoise0000.shukutenalarm.R.string.weather_clear)
-        WeatherCategory.CLOUDY -> context.getString(io.github.whitenoise0000.shukutenalarm.R.string.weather_cloudy)
-        WeatherCategory.RAIN -> context.getString(io.github.whitenoise0000.shukutenalarm.R.string.weather_rain)
-        WeatherCategory.SNOW -> context.getString(io.github.whitenoise0000.shukutenalarm.R.string.weather_snow)
+        Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Exiting withTimeout block. Result = $result")
+        result
     }
 }
