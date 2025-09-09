@@ -83,7 +83,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun SettingsScreen(onSaved: () -> Unit) {
+fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { SettingsRepository(context) }
     val geocoding = remember { GeocodingRepository(context) }
@@ -146,6 +146,45 @@ fun SettingsScreen(onSaved: () -> Unit) {
             }
         }
 
+    LaunchedEffect(registerSave) {
+        registerSave {
+            saving.value = true
+            val latD = lat.value.toDoubleOrNull() ?: 35.0
+            val lonD = lon.value.toDoubleOrNull() ?: 135.0
+            val delay = delayMinutes.value.toIntOrNull()?.coerceIn(0, 180) ?: 60
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    repo.save(
+                        UserSettings(
+                            latD, lonD, useCurrent.value, delay,
+                            holidayRefreshMonthly = holidayMonthly.value,
+                            holidayRefreshWifiOnly = holidayWifiOnly.value,
+                            cityName = if (useCurrent.value) null else selectedCityName.value.takeIf { it.isNotBlank() }
+                        )
+                    )
+                }
+                if (holidayMonthly.value) {
+                    HolidaysRefreshScheduler.schedule(context, wifiOnly = holidayWifiOnly.value)
+                } else {
+                    HolidaysRefreshScheduler.cancel(context)
+                }
+                saving.value = false
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.toast_settings_saved),
+                    Toast.LENGTH_SHORT
+                ).show()
+                context.sendBroadcast(
+                    Intent(
+                        context,
+                        NextAlarmWidgetProvider::class.java
+                    ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
+                )
+                onSaved()
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -185,7 +224,27 @@ fun SettingsScreen(onSaved: () -> Unit) {
                         SegmentedButton(
                             modifier = Modifier.weight(1f),
                             selected = selected,
-                            onClick = { useCurrent.value = index == 1 },
+                            onClick = {
+                                useCurrent.value = index == 1
+                                if (useCurrent.value) {
+                                    val granted = ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (granted) {
+                                        scope.launch {
+                                            val loc =
+                                                withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
+                                            loc?.let {
+                                                lat.value = it.latitude.toString(); lon.value =
+                                                it.longitude.toString()
+                                            }
+                                        }
+                                    } else {
+                                        permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                    }
+                                }
+                            },
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = index,
                                 count = items.size
@@ -193,12 +252,14 @@ fun SettingsScreen(onSaved: () -> Unit) {
                         ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
                 }
-                // 現在地は「アラーム直前の天気先読み」で取得します
-                Text(
-                    text = stringResource(R.string.settings_weather_timing),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (useCurrent.value) {
+                    // 現在地は「アラーム直前の天気先読み」で取得します
+                    Text(
+                        text = stringResource(R.string.settings_weather_timing),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 // 検索実行処理（ボタン/IME共通）
                 fun performCitySearch() {
@@ -225,20 +286,25 @@ fun SettingsScreen(onSaved: () -> Unit) {
                 }
 
                 if (!useCurrent.value) {
-                    OutlinedTextField(
-                        value = cityQuery.value,
-                        onValueChange = { cityQuery.value = it },
-                        label = { Text(stringResource(R.string.hint_city_search)) },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        maxLines = 1,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { performCitySearch() })
-                    )
-                    RowAlignCenter {
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = cityQuery.value,
+                            onValueChange = { cityQuery.value = it },
+                            label = { Text(stringResource(R.string.hint_city_search)) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            maxLines = 1,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { performCitySearch() })
+                        )
                         Button(
                             enabled = !searching.value && cityQuery.value.isNotBlank(),
-                            onClick = { performCitySearch() }) {
+                            onClick = { performCitySearch() }
+                        ) {
                             Text(
                                 if (searching.value) stringResource(R.string.action_searching) else stringResource(
                                     R.string.action_search
@@ -296,33 +362,12 @@ fun SettingsScreen(onSaved: () -> Unit) {
                             }
                         }
                     }
-                } else {
-                    RowAlignCenter {
-                        Button(onClick = {
-                            val granted = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) {
-                                scope.launch {
-                                    val loc =
-                                        withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
-                                    loc?.let {
-                                        lat.value = it.latitude.toString(); lon.value =
-                                        it.longitude.toString()
-                                    }
-                                 }
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                            }
-                        }) { Text(stringResource(R.string.action_detect_current_location)) }
-                    }
-                    Text(
-                        text = stringResource(R.string.settings_weather_privacy),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+                Text(
+                    text = stringResource(R.string.settings_weather_privacy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 // 取得テストボタン：現在の選択（都市 or 現在地）に基づく座標で天気取得を即時実行し、キャッシュを温める
                 RowAlignCenter {
@@ -564,48 +609,6 @@ fun SettingsScreen(onSaved: () -> Unit) {
             }
         }
 
-        Button(
-            enabled = !saving.value,
-            onClick = {
-                saving.value = true
-                val latD = lat.value.toDoubleOrNull() ?: 35.0
-                val lonD = lon.value.toDoubleOrNull() ?: 135.0
-                val delay = delayMinutes.value.toIntOrNull()?.coerceIn(0, 180) ?: 60
-                scope.launch {
-                    withContext(Dispatchers.IO) {
-                        repo.save(
-                            UserSettings(
-                                latD, lonD, useCurrent.value, delay,
-                                holidayRefreshMonthly = holidayMonthly.value,
-                                holidayRefreshWifiOnly = holidayWifiOnly.value,
-                                cityName = if (useCurrent.value) null else selectedCityName.value.takeIf { it.isNotBlank() }
-                            )
-                        )
-                    }
-                    if (holidayMonthly.value) {
-                        HolidaysRefreshScheduler.schedule(context, wifiOnly = holidayWifiOnly.value)
-                    } else {
-                        HolidaysRefreshScheduler.cancel(context)
-                    }
-                    saving.value = false
-                    // 設定保存完了のトースト表示後、一覧へ戻る
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.toast_settings_saved),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    // ウィジェットへ更新通知（DELAY分などの反映）
-                    context.sendBroadcast(
-                        Intent(
-                            context,
-                            NextAlarmWidgetProvider::class.java
-                        ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
-                    )
-                    onSaved()
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(stringResource(R.string.text_save)) }
     }
 }
 

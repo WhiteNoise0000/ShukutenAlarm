@@ -40,12 +40,11 @@
     <string name="action_search">検索</string>
     <string name="action_searching">検索中…</string>
     <string name="action_select">選択</string>
-    <string name="action_detect_current_location">現在地を取得</string>
     <string name="action_fetch_weather_now">今すぐ天気を取得</string>
     <string name="action_fetching_weather">取得中…</string>
 
     <!-- 設定/現在地・天気 -->
-    <string name="hint_city_search">都市名で検索（例: 東京, Osaka）</string>
+    <string name="hint_city_search">都市名（例: 東京, Osaka）</string>
     <string name="settings_weather_header">天気の取得元</string>
     <string name="settings_weather_desc">アラーム時の天気判定に使用します。都市を指定するか、現在地を使用できます。</string>
     <string name="settings_source_city">都市を指定</string>

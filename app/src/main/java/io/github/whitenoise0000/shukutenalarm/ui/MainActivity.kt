@@ -114,7 +114,7 @@ private fun AppRoot() {
                                 contentDescription = stringResource(R.string.label_settings)
                             )
                         }
-                    } else if (route.startsWith("edit")) {
+                    } else if (route.startsWith("edit") || route == "settings") {
                         IconButton(onClick = { editSaveAction.value?.invoke() }) {
                             Icon(
                                 Icons.Outlined.Save,
@@ -221,7 +221,10 @@ private fun AppNavHost(
         }
         composable("settings") {
             // 設定保存後はアラーム一覧へ戻るため、コールバックを渡す
-            SettingsScreen(onSaved = { navController.popBackStack() })
+            SettingsScreen(
+                onSaved = { navController.popBackStack() },
+                registerSave = { action -> editSaveAction.value = action }
+            )
         }
     }
 }
