@@ -50,7 +50,11 @@ class SettingsRepository(private val context: Context) {
             prefs[delayKey] = settings.delayMinutes
             prefs[holidayRefreshMonthlyKey] = settings.holidayRefreshMonthly
             prefs[holidayRefreshWifiOnlyKey] = settings.holidayRefreshWifiOnly
-            prefs[cityNameKey] = settings.cityName ?: ""
+            if (settings.cityName.isNullOrBlank()) {
+                prefs.remove(cityNameKey)
+            } else {
+                prefs[cityNameKey] = settings.cityName
+            }
         }
     }
 }
