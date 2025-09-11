@@ -159,8 +159,7 @@ private fun RingingScreen(
                     ExoAudioAttributes.Builder()
                         .setUsage(C.USAGE_ALARM)
                         .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                        .build(),
-                    /* handleAudioFocus = */ true
+                        .build(), false
                 )
                 setMediaItem(MediaItem.fromUri(soundUri))
                 prepare()
