@@ -25,6 +25,9 @@ class SettingsRepository(private val context: Context) {
     private val holidayRefreshMonthlyKey = booleanPreferencesKey("holidayRefreshMonthly")
     private val holidayRefreshWifiOnlyKey = booleanPreferencesKey("holidayRefreshWifiOnly" )
     private val cityNameKey = stringPreferencesKey(PreferencesKeys.KEY_CITY_NAME)
+    private val selectedOfficeKey = stringPreferencesKey(PreferencesKeys.KEY_SELECTED_OFFICE)
+    private val selectedClass10Key = stringPreferencesKey(PreferencesKeys.KEY_SELECTED_CLASS10)
+    private val masterRefreshIntervalDaysKey = intPreferencesKey("masterRefreshIntervalDays")
 
     /** 現在の設定のストリームを取得する。*/
     val settingsFlow: Flow<UserSettings> = context.appDataStore.data
@@ -37,7 +40,10 @@ class SettingsRepository(private val context: Context) {
                 delayMinutes = prefs[delayKey] ?: 60,
                 holidayRefreshMonthly = prefs[holidayRefreshMonthlyKey] ?: false,
                 holidayRefreshWifiOnly = prefs[holidayRefreshWifiOnlyKey] ?: true,
-                cityName = prefs[cityNameKey]
+                masterRefreshIntervalDays = prefs[masterRefreshIntervalDaysKey] ?: 30,
+                cityName = prefs[cityNameKey],
+                selectedOffice = prefs[selectedOfficeKey],
+                selectedClass10 = prefs[selectedClass10Key]
             )
         }
 
@@ -50,10 +56,21 @@ class SettingsRepository(private val context: Context) {
             prefs[delayKey] = settings.delayMinutes
             prefs[holidayRefreshMonthlyKey] = settings.holidayRefreshMonthly
             prefs[holidayRefreshWifiOnlyKey] = settings.holidayRefreshWifiOnly
+            prefs[masterRefreshIntervalDaysKey] = settings.masterRefreshIntervalDays
             if (settings.cityName.isNullOrBlank()) {
                 prefs.remove(cityNameKey)
             } else {
                 prefs[cityNameKey] = settings.cityName
+            }
+            if (settings.selectedOffice.isNullOrBlank()) {
+                prefs.remove(selectedOfficeKey)
+            } else {
+                prefs[selectedOfficeKey] = settings.selectedOffice
+            }
+            if (settings.selectedClass10.isNullOrBlank()) {
+                prefs.remove(selectedClass10Key)
+            } else {
+                prefs[selectedClass10Key] = settings.selectedClass10
             }
         }
     }
@@ -69,5 +86,11 @@ data class UserSettings(
     val delayMinutes: Int,
     val holidayRefreshMonthly: Boolean = false,
     val holidayRefreshWifiOnly: Boolean = true,
-    val cityName: String? = null
+    /** マスタ自動更新の間隔（日）。既定=30（日） */
+    val masterRefreshIntervalDays: Int = 30,
+    val cityName: String? = null,
+    /** 都市名検索で選択したofficeコード */
+    val selectedOffice: String? = null,
+    /** 都市名検索で選択したclass10コード（任意） */
+    val selectedClass10: String? = null
 )

@@ -7,9 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.RingtoneManager
-import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
@@ -20,8 +21,7 @@ import io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository
 import io.github.whitenoise0000.shukutenalarm.platform.Notifications
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
 import io.github.whitenoise0000.shukutenalarm.ui.RingingActivity
-import io.github.whitenoise0000.shukutenalarm.weather.OpenMeteoApi
-import io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository
+import io.github.whitenoise0000.shukutenalarm.ui.getLabel
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,11 +37,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import retrofit2.Retrofit
-import retrofit2.create
 import java.time.LocalDate
-import android.util.Log
-import io.github.whitenoise0000.shukutenalarm.ui.getLabel
-import androidx.core.net.toUri
 
 /**
  * アラーム発火時の BroadcastReceiver。
@@ -210,15 +206,29 @@ class AlarmReceiver : BroadcastReceiver() {
                 .addInterceptor(HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BASIC
                 })
+                .addInterceptor(io.github.whitenoise0000.shukutenalarm.network.EtagCacheInterceptor(context))
                 .build()
-            val retrofit = Retrofit.Builder()
-                .baseUrl("https://api.open-meteo.com/")
+            val jmaRetrofit = Retrofit.Builder()
+                .baseUrl("https://www.jma.go.jp/")
                 .client(client)
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
-            val api = retrofit.create<OpenMeteoApi>()
-            val repo = WeatherRepository(context, api)
-            val fetchedCategory = repo.prefetchToday(lat, lon)
+            val gsiRetrofit = Retrofit.Builder()
+                .baseUrl("https://mreversegeocoder.gsi.go.jp/")
+                .client(client)
+                .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+                .build()
+            val forecastApi = jmaRetrofit.create(io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi::class.java)
+            val gsiApi = gsiRetrofit.create(io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi::class.java)
+            val constApi = jmaRetrofit.create(io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi::class.java)
+            val areaRepo = io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository(context, constApi)
+            val repo = io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository(context, forecastApi, gsiApi, areaRepo)
+            val fetchedCategory = if (settings.useCurrentLocation) {
+                repo.prefetchByCurrentLocation(lat, lon)
+            } else {
+                val office = settings.selectedOffice
+                if (office.isNullOrBlank()) null else repo.prefetchByOffice(office, settings.selectedClass10)
+            }
             Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Fetched category = $fetchedCategory")
             fetchedCategory
         }

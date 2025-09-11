@@ -58,14 +58,16 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import io.github.whitenoise0000.shukutenalarm.R
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository
+import io.github.whitenoise0000.shukutenalarm.network.EtagCacheInterceptor
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
 import io.github.whitenoise0000.shukutenalarm.settings.UserSettings
-import io.github.whitenoise0000.shukutenalarm.weather.GeoPlace
-import io.github.whitenoise0000.shukutenalarm.weather.GeocodingRepository
-import io.github.whitenoise0000.shukutenalarm.weather.OpenMeteoApi
 import io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository
+import io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository
+import io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
-import io.github.whitenoise0000.shukutenalarm.work.HolidaysRefreshScheduler
+import io.github.whitenoise0000.shukutenalarm.work.MasterRefreshScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -86,7 +88,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { SettingsRepository(context) }
-    val geocoding = remember { GeocodingRepository(context) }
+    // 都市名検索は area.json ローカル検索へ切替えるためGeocoding依存は廃止
 
     val lat = remember { mutableStateOf("35.0") }
     val lon = remember { mutableStateOf("135.0") }
@@ -94,13 +96,18 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val saving = remember { mutableStateOf(false) }
     val delayMinutes = remember { mutableStateOf("60") }
     val cityQuery = remember { mutableStateOf("") }
-    val cityResults = remember { mutableStateListOf<GeoPlace>() }
+    data class CityItem(val name: String, val office: String, val class10: String?)
+    val cityResults = remember { mutableStateListOf<CityItem>() }
     val selectedCityName = remember { mutableStateOf("") }
+    val selectedOffice = remember { mutableStateOf<String?>(null) }
+    val selectedClass10 = remember { mutableStateOf<String?>(null) }
     val errorMessage = remember { mutableStateOf<String?>(null) }
     val searching = remember { mutableStateOf(false) }
     val holidayMonthly = remember { mutableStateOf(false) }
     val holidayWifiOnly = remember { mutableStateOf(true) }
+    val masterIntervalDays = remember { mutableStateOf(30) }
     val holidayLastUpdatedText = remember { mutableStateOf<String?>(null) }
+    val masterLastUpdatedText = remember { mutableStateOf<String?>(null) }
     val holidayRefreshing = remember { mutableStateOf(false) }
     val holidayRefreshMessage = remember { mutableStateOf<String?>(null) }
     // 天気の即時取得（テスト）用の状態
@@ -114,9 +121,12 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         lon.value = s.longitude.toString()
         useCurrent.value = s.useCurrentLocation
         selectedCityName.value = s.cityName ?: ""
+        selectedOffice.value = s.selectedOffice
+        selectedClass10.value = s.selectedClass10
         delayMinutes.value = s.delayMinutes.toString()
         holidayMonthly.value = s.holidayRefreshMonthly
         holidayWifiOnly.value = s.holidayRefreshWifiOnly
+        masterIntervalDays.value = s.masterRefreshIntervalDays
 
         // 最終更新の読み込み
         val key =
@@ -131,6 +141,20 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                 dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
             )
         } else context.getString(R.string.label_holiday_last_updated_never)
+
+        // area.json の最終取得
+        val areaKey =
+            longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_AREA_LAST_FETCH)
+        val areaLast =
+            withContext(Dispatchers.IO) { context.appDataStore.data.map { it[areaKey] ?: 0L }.first() }
+        masterLastUpdatedText.value = if (areaLast > 0L) {
+            val dt = java.time.Instant.ofEpochMilli(areaLast).atZone(java.time.ZoneId.systemDefault())
+                .toLocalDateTime()
+            context.getString(
+                R.string.label_master_last_updated,
+                dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
+            )
+        } else null
     }
 
     val permissionLauncher =
@@ -159,14 +183,16 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                             latD, lonD, useCurrent.value, delay,
                             holidayRefreshMonthly = holidayMonthly.value,
                             holidayRefreshWifiOnly = holidayWifiOnly.value,
-                            cityName = if (useCurrent.value) null else selectedCityName.value.takeIf { it.isNotBlank() }
+                            cityName = if (useCurrent.value) null else selectedCityName.value.takeIf { it.isNotBlank() },
+                            selectedOffice = if (useCurrent.value) null else selectedOffice.value,
+                            selectedClass10 = if (useCurrent.value) null else selectedClass10.value
                         )
                     )
                 }
                 if (holidayMonthly.value) {
-                    HolidaysRefreshScheduler.schedule(context, wifiOnly = holidayWifiOnly.value)
+                    MasterRefreshScheduler.schedule(context, wifiOnly = holidayWifiOnly.value, intervalDays = masterIntervalDays.value)
                 } else {
-                    HolidaysRefreshScheduler.cancel(context)
+                    MasterRefreshScheduler.cancel(context)
                 }
                 saving.value = false
                 Toast.makeText(
@@ -270,12 +296,35 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                             if (query.isBlank()) {
                                 errorMessage.value = context.getString(R.string.error_empty_query)
                             } else {
-                                val results =
-                                    withContext(Dispatchers.IO) { geocoding.searchCity(query) }
-                                if (results.isEmpty()) errorMessage.value =
-                                    context.getString(R.string.error_no_results) else cityResults.addAll(
-                                    results
-                                )
+                                val items = withContext(Dispatchers.IO) {
+                                    // JMA + ETagキャッシュ付きクライアントを都度生成
+                                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                    val client = okhttp3.OkHttpClient.Builder()
+                                        .addInterceptor(okhttp3.logging.HttpLoggingInterceptor().apply {
+                                            level = okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
+                                        })
+                                        .addInterceptor(EtagCacheInterceptor(context))
+                                        .build()
+                                    val retrofit = retrofit2.Retrofit.Builder()
+                                        .baseUrl("https://www.jma.go.jp/")
+                                        .client(client)
+                                        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+                                        .build()
+                                    val constApi = retrofit.create(JmaConstApi::class.java)
+                                    val areaRepo = AreaRepository(context, constApi)
+                                    areaRepo.searchByName(query)
+                                }
+                                if (items.isEmpty()) {
+                                    errorMessage.value = context.getString(R.string.error_no_results)
+                                } else {
+                                    val mapped = items.mapNotNull {
+                                        when (it) {
+                                            is AreaRepository.SearchResult.Office -> CityItem(it.name, it.code, null)
+                                            is AreaRepository.SearchResult.Class20 -> CityItem(it.name, it.officeCode ?: return@mapNotNull null, it.class10Code)
+                                        }
+                                    }
+                                    cityResults.addAll(mapped)
+                                }
                             }
                         } catch (_: Exception) {
                             errorMessage.value = context.getString(R.string.error_network_generic)
@@ -332,25 +381,19 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                             .heightIn(max = 240.dp)) {
                             items(
                                 cityResults,
-                                key = {
-                                    it.id ?: (it.name + it.latitude + it.longitude).hashCode()
-                                }) { place ->
+                                key = { (it.office + ":" + (it.class10 ?: "")).hashCode() }
+                            ) { item ->
                                 RowAlignCenter {
-                                    val subtitle = listOfNotNull(
-                                        place.admin1,
-                                        place.country
-                                    ).joinToString(" / ")
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(place.name)
-                                        if (subtitle.isNotBlank()) Text(
-                                            subtitle,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
+                                        Text(item.name)
+                                        val codeLine = listOfNotNull("office=" + item.office, item.class10?.let { "class10=$it" }).joinToString("  ")
+                                        Text(codeLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Button(onClick = {
-                                        lat.value = place.latitude.toString(); lon.value =
-                                        place.longitude.toString(); selectedCityName.value =
-                                        place.name; cityResults.clear()
+                                        selectedCityName.value = item.name
+                                        selectedOffice.value = item.office
+                                        selectedClass10.value = item.class10
+                                        cityResults.clear()
                                         Toast.makeText(
                                             context,
                                             context.getString(R.string.toast_city_selected),
@@ -402,21 +445,32 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                                                 level =
                                                     okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
                                             })
+                                        .addInterceptor(EtagCacheInterceptor(context))
                                         .build()
                                     // Retrofit のコンバータは他箇所と同様に Json 拡張の asConverterFactory を用いる
                                     val contentType = "application/json".toMediaType()
-                                    val retrofit = retrofit2.Retrofit.Builder()
-                                        .baseUrl("https://api.open-meteo.com/")
+                                    val jmaRetrofit = retrofit2.Retrofit.Builder()
+                                        .baseUrl("https://www.jma.go.jp/")
                                         .client(client)
                                         .addConverterFactory(json.asConverterFactory(contentType))
                                         .build()
-                                    val api = retrofit.create(OpenMeteoApi::class.java)
-                                    val repo = WeatherRepository(context, api)
+                                    val gsiRetrofit = retrofit2.Retrofit.Builder()
+                                        .baseUrl("https://mreversegeocoder.gsi.go.jp/")
+                                        .client(client)
+                                        .addConverterFactory(json.asConverterFactory(contentType))
+                                        .build()
+                                    val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
+                                    val gsiApi = gsiRetrofit.create(GsiApi::class.java)
+                                    val constApi = jmaRetrofit.create(JmaConstApi::class.java)
+                                    val areaRepo = AreaRepository(context, constApi)
+                                    val repo = WeatherRepository(context, forecastApi, gsiApi, areaRepo)
                                     val cat = withContext(Dispatchers.IO) {
-                                        repo.prefetchToday(
-                                            latUsed,
-                                            lonUsed
-                                        )
+                                        if (useCur) {
+                                            repo.prefetchByCurrentLocation(latUsed, lonUsed)
+                                        } else {
+                                            val office = selectedOffice.value
+                                            if (office.isNullOrBlank()) null else repo.prefetchByOffice(office, selectedClass10.value)
+                                        }
                                     }
                                     if (cat != null) {
                                         val label = cat.getLabel(context)
@@ -511,12 +565,12 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    stringResource(R.string.title_holiday_refresh),
+                    stringResource(R.string.title_master_refresh),
                     style = MaterialTheme.typography.titleMedium
                 )
                 RowAlignCenter {
                     Text(
-                        stringResource(R.string.label_holiday_refresh_monthly),
+                        stringResource(R.string.label_master_auto_refresh),
                         modifier = Modifier.weight(1f)
                     )
                     Switch(
@@ -533,13 +587,41 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                             checked = holidayWifiOnly.value,
                             onCheckedChange = { holidayWifiOnly.value = it })
                     }
+                    // 更新間隔（7/14/30日）
                     Text(
-                        text = stringResource(R.string.hint_holiday_refresh),
+                        text = stringResource(R.string.label_refresh_interval),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val items = listOf(7, 14, 30)
+                        items.forEachIndexed { index, days ->
+                            val selected = masterIntervalDays.value == days
+                            SegmentedButton(
+                                modifier = Modifier.weight(1f),
+                                selected = selected,
+                                onClick = { masterIntervalDays.value = days },
+                                shape = SegmentedButtonDefaults.itemShape(index, items.size)
+                            ) {
+                                Text(
+                                    when (days) {
+                                        7 -> stringResource(R.string.interval_weekly)
+                                        14 -> stringResource(R.string.interval_biweekly)
+                                        else -> stringResource(R.string.interval_monthly)
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.hint_master_refresh),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                holidayLastUpdatedText.value?.let { txt ->
+                masterLastUpdatedText.value?.let { txt ->
                     Text(
                         text = txt,
                         style = MaterialTheme.typography.bodySmall,
@@ -554,7 +636,28 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                             holidayRefreshMessage.value = null
                             scope.launch {
                                 try {
+                                    // 祝日（YAML）更新
                                     withContext(Dispatchers.IO) { HolidayRepository(context).forceRefresh() }
+                                    // area.json（JMA）更新（ETag/IMS対応）
+                                    val json =
+                                        kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                    val client = okhttp3.OkHttpClient.Builder()
+                                        .addInterceptor(
+                                            okhttp3.logging.HttpLoggingInterceptor().apply {
+                                                level =
+                                                    okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
+                                            })
+                                        .addInterceptor(EtagCacheInterceptor(context))
+                                        .build()
+                                    val contentType = "application/json".toMediaType()
+                                    val jmaRetrofit = retrofit2.Retrofit.Builder()
+                                        .baseUrl("https://www.jma.go.jp/")
+                                        .client(client)
+                                        .addConverterFactory(json.asConverterFactory(contentType))
+                                        .build()
+                                    val constApi = jmaRetrofit.create(JmaConstApi::class.java)
+                                    val areaRepo = AreaRepository(context, constApi)
+                                    withContext(Dispatchers.IO) { areaRepo.refreshMaster() }
                                     val key =
                                         longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
                                     val last = withContext(Dispatchers.IO) {
@@ -571,11 +674,24 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                                             dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
                                         )
                                     }
+                                    val areaKey2 = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_AREA_LAST_FETCH)
+                                    val areaLast2 = withContext(Dispatchers.IO) {
+                                        context.appDataStore.data.map { it[areaKey2] ?: 0L }.first()
+                                    }
+                                    if (areaLast2 > 0L) {
+                                        val dt = java.time.Instant.ofEpochMilli(areaLast2)
+                                            .atZone(java.time.ZoneId.systemDefault())
+                                            .toLocalDateTime()
+                                        masterLastUpdatedText.value = context.getString(
+                                            R.string.label_master_last_updated,
+                                            dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
+                                        )
+                                    }
                                     holidayRefreshMessage.value =
-                                        context.getString(R.string.text_refreshed)
+                                        context.getString(R.string.toast_master_refreshed)
                                     Toast.makeText(
                                         context,
-                                        context.getString(R.string.toast_holidays_refreshed),
+                                        context.getString(R.string.toast_master_refreshed),
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 } catch (_: Exception) {

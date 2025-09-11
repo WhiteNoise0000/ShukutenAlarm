@@ -1,48 +1,50 @@
 package io.github.whitenoise0000.shukutenalarm.weather
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys
-import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
-import io.github.whitenoise0000.shukutenalarm.data.model.toCategory
+import io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository
+import io.github.whitenoise0000.shukutenalarm.weather.jma.ForecastRepository
+import io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaMapper
 
 /**
- * 天気取得用のリポジトリ。
- * - Open‑Meteo から当日分の天気を取得し、カテゴリへ変換する。
- * - 直近の結果を DataStore にキャッシュ（当日限り想定）。
+ * 天気取得の上位調停リポジトリ（JMA仕様）。
+ * - 現在地連動時: GSI逆ジオ→muniCd→class20→class10→office→予報取得
+ * - 都市名検索選択時: office/class10指定で予報取得（class10未指定ならoffice配下の先頭を使用）
+ * - 取得後はDataStoreに直近カテゴリを保存（ForecastRepository側に委譲）。
  */
 class WeatherRepository(
     private val context: Context,
-    private val api: OpenMeteoApi
+    private val forecastApi: JmaForecastApi,
+    private val gsiApi: GsiApi,
+    private val areaRepository: AreaRepository
 ) {
-    /**
-     * 当日の代表的な天気カテゴリを推定して返す（簡易: 最初の時間の weathercode を使用）。
-     */
-    suspend fun fetchTodayCategory(lat: Double, lon: Double): WeatherCategory? {
-        // Open‑Meteo のデータは一部の時間で null が混在する可能性があるため、
-        // 最初に現れる非 null の weathercode を使用する。
-        val res = api.jma(lat = lat, lon = lon)
-        val code = res.hourly.weathercode
-            ?.firstOrNull { it != null }
-            ?: return null
-        return code.toCategory()
+    private val forecastRepo by lazy { ForecastRepository(context, forecastApi) }
+    private val mapper by lazy { JmaMapper(areaRepository) }
+
+    /** 現在地連動で予報カテゴリを取得して保存。*/
+    suspend fun prefetchByCurrentLocation(lat: Double, lon: Double): WeatherCategory? {
+        // muniCd取得
+        val gsi = gsiApi.lonLatToAddress(lat = lat, lon = lon)
+        val muniCd = gsi.results.muniCd
+        val resolved = mapper.resolveFromMuniCd(muniCd) ?: return null
+        val class10 = resolved.second
+        val office = resolved.third
+        val cat = forecastRepo.fetchCategory(office = office, class10 = class10)
+        forecastRepo.cacheCategory(cat)
+        return cat
     }
 
-    /**
-     * 先読みとキャッシュ保存を行う。
-     */
-    suspend fun prefetchToday(lat: Double, lon: Double): WeatherCategory? {
-        val cat = fetchTodayCategory(lat, lon)
-        // 最小限の JSON を保存（timestamp は簡易に System.currentTimeMillis）
-        val value = cat?.name ?: ""
-        val now = System.currentTimeMillis()
-        val jsonText = "{\"timestamp\":$now,\"category\":\"$value\"}"
-        val key = stringPreferencesKey(PreferencesKeys.KEY_LAST_WEATHER_JSON)
-        context.appDataStore.edit { prefs ->
-            prefs[key] = jsonText
-        }
+    /** office/class10を用いて予報カテゴリを取得して保存。*/
+    suspend fun prefetchByOffice(office: String, class10OrNull: String? = null): WeatherCategory? {
+        val class10 = class10OrNull ?: run {
+            val area = areaRepository.getAreaMaster()
+            area.offices[office]?.children?.firstOrNull()
+        } ?: return null
+        val cat = forecastRepo.fetchCategory(office = office, class10 = class10)
+        forecastRepo.cacheCategory(cat)
         return cat
     }
 }
+

@@ -112,6 +112,7 @@ class HolidayRepository(private val context: Context) {
         }
         OkHttpClient.Builder()
             .addInterceptor(logger)
+            .addInterceptor(io.github.whitenoise0000.shukutenalarm.network.EtagCacheInterceptor(context))
             .readTimeout(15, TimeUnit.SECONDS)
             .connectTimeout(10, TimeUnit.SECONDS)
             .build()

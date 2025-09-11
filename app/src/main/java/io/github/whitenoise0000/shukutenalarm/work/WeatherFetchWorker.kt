@@ -8,9 +8,13 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import io.github.whitenoise0000.shukutenalarm.network.EtagCacheInterceptor
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
-import io.github.whitenoise0000.shukutenalarm.weather.OpenMeteoApi
 import io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository
+import io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository
+import io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -19,11 +23,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
-import retrofit2.create
 
 /**
- * 天気の事前取得を行う WorkManager の Worker。
- * - SettingsRepository から座標を読み、Open‑Meteo で取得・キャッシュする。
+ * 天気の定期取得を行うWorker。
+ * - 設定に基づき、現在地連動時はGSI→JMA、手動選択時はoffice/class10で取得する。
  */
 class WeatherFetchWorker(
     appContext: Context,
@@ -34,12 +37,19 @@ class WeatherFetchWorker(
         return@withContext try {
             val settingsRepo = SettingsRepository(applicationContext)
             val settings = settingsRepo.settingsFlow.first()
-            // 「現在地を使用」設定が有効なら、実行時点で端末のCOARSE位置を取得して座標に反映（権限未許可や取得不可時は保存値を使用）
+
+            // 現在地の推定（COARSEのみ利用）。
             val (lat, lon) = if (settings.useCurrentLocation) {
-                val granted = ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                val granted = ContextCompat.checkSelfPermission(
+                    applicationContext, Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
                 if (granted) {
                     val lm = applicationContext.getSystemService(LocationManager::class.java)
-                    val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER, LocationManager.GPS_PROVIDER)
+                    val providers = listOf(
+                        LocationManager.NETWORK_PROVIDER,
+                        LocationManager.PASSIVE_PROVIDER,
+                        LocationManager.GPS_PROVIDER
+                    )
                     var out = settings.latitude to settings.longitude
                     providers.forEach { p ->
                         val loc = runCatching { lm?.getLastKnownLocation(p) }.getOrNull()
@@ -48,23 +58,40 @@ class WeatherFetchWorker(
                     out
                 } else settings.latitude to settings.longitude
             } else settings.latitude to settings.longitude
+
             val json = Json { ignoreUnknownKeys = true }
             val client = OkHttpClient.Builder()
                 .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+                .addInterceptor(EtagCacheInterceptor(applicationContext))
                 .build()
             val contentType = "application/json".toMediaType()
-            // baseUrl は末尾スラッシュ必須
-            val retrofit = Retrofit.Builder()
-                .baseUrl("https://api.open-meteo.com/")
+            val jmaRetrofit = Retrofit.Builder()
+                .baseUrl("https://www.jma.go.jp/")
                 .client(client)
                 .addConverterFactory(json.asConverterFactory(contentType))
                 .build()
-            val api = retrofit.create<OpenMeteoApi>()
-            val repo = WeatherRepository(applicationContext, api)
-            repo.prefetchToday(lat, lon)
+            val gsiRetrofit = Retrofit.Builder()
+                .baseUrl("https://mreversegeocoder.gsi.go.jp/")
+                .client(client)
+                .addConverterFactory(json.asConverterFactory(contentType))
+                .build()
+            val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
+            val gsiApi = gsiRetrofit.create(GsiApi::class.java)
+            val constApi = jmaRetrofit.create(JmaConstApi::class.java)
+            val areaRepo = AreaRepository(applicationContext, constApi)
+            val repo = WeatherRepository(applicationContext, forecastApi, gsiApi, areaRepo)
+            if (settings.useCurrentLocation) {
+                repo.prefetchByCurrentLocation(lat, lon)
+            } else {
+                val office = settings.selectedOffice
+                if (!office.isNullOrBlank()) {
+                    repo.prefetchByOffice(office, settings.selectedClass10)
+                }
+            }
             Result.success()
         } catch (_: Exception) {
             Result.retry()
         }
     }
 }
+

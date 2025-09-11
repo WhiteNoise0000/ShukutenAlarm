@@ -19,10 +19,7 @@
     <string name="label_enabled_toggle">有効</string>
     <string name="label_holiday_only">祝日のみ鳴動</string>
     <string name="label_delay_minutes_holiday">祝日DELAY（分）</string>
-    <string name="label_holiday_refresh_monthly">月1回自動で更新</string>
     <string name="label_wifi_only">Wi‑Fiのみで更新</string>
-    <string name="label_holiday_last_updated">最終更新: %1$s</string>
-    <string name="label_holiday_last_updated_never">最終更新: 未取得</string>
     <string name="label_today_holiday">今日は祝日です</string>
     <string name="label_weather_prefix">天気: %1$s</string>
 
@@ -44,23 +41,15 @@
     <string name="action_fetching_weather">取得中…</string>
 
     <!-- 設定/現在地・天気 -->
-    <string name="hint_city_search">都市名（例: 東京, Osaka）</string>
+    <string name="hint_city_search">都市名（例: 渋谷区、横浜市）</string>
     <string name="settings_weather_header">天気の取得元</string>
-    <string name="settings_weather_desc">アラーム時の天気判定に使用します。都市を指定するか、現在地を使用できます。</string>
+    <string name="settings_weather_desc">アラーム時の天気判定に使用します。都市名検索（JMAエリアマスタ準拠）または現在地（GSI逆ジオ）で予報エリアを決定します。</string>
     <string name="settings_source_city">都市を指定</string>
     <string name="settings_source_current">現在地を使用</string>
-    <string name="settings_weather_privacy">位置情報は天気予報の取得のみに使用し、外部に送信しません。</string>
-    <string name="settings_weather_timing">現在地は「アラーム直前の天気先読み」で取得します</string>
-
-    <!-- 祝日自動更新 -->
-    <string name="title_holiday_refresh">祝日データ更新</string>
-    <string name="hint_holiday_refresh">更新はバックグラウンドで行います。Wi‑Fiのみを有効にするとモバイル回線では更新しません。</string>
-    <string name="action_refresh_now">今すぐ更新</string>
-    <string name="action_refreshing">更新中…</string>
-    <string name="text_refreshed">更新しました</string>
+    <string name="settings_weather_privacy">位置情報は「現在地を使用」選択時のみ、逆ジオコーディングのために利用します。測位結果は保存せず、外部送信もしません。</string>
+    <string name="settings_weather_timing">現在地は「アラーム直前の天気先読み」で推定します</string>
     <string name="toast_weather_fetched">天気を取得しました: %1$s</string>
     <string name="error_weather_fetch_failed">天気の取得に失敗しました</string>
-    <string name="error_refresh_failed">更新に失敗しました</string>
 
     <!-- ポリシー -->
     <string name="policy_same">同じ</string>
@@ -85,7 +74,7 @@
 
     <!-- エラー -->
     <string name="error_empty_query">都市名を入力してください</string>
-    <string name="error_no_results">検索結果が見つかりません。ヒットしない場合はローマ字（Osaka, Kyoto）でもお試しください。検索APIの仕様により、区/町/村はヒットしない場合があります。</string>
+    <string name="error_no_results">検索結果が見つかりません。表記ゆれに注意し、市/区の正式名称でお試しください。</string>
     <string name="error_network_generic">通信に失敗しました。ネットワーク状態を確認してください</string>
 
     <!-- 曜日/天気 -->
@@ -116,7 +105,6 @@
     <string name="toast_alarm_enabled">アラームを有効にしました</string>
     <string name="toast_alarm_disabled">アラームを無効にしました</string>
     <string name="toast_settings_saved">設定を保存しました</string>
-    <string name="toast_holidays_refreshed">祝日データを更新しました</string>
     <string name="toast_city_selected">都市を選択しました</string>
 
     <!-- スキップ状態表示（一覧） -->
@@ -124,6 +112,21 @@
     <string name="action_clear_skip">解除</string>
     <string name="toast_skip_cleared">スキップを解除しました</string>
     <string name="label_holiday">祝</string>
+    <!-- マスタデータ更新（祝日＋JMAエリア）関連 -->
+    <string name="title_master_refresh">マスタデータ更新</string>
+    <string name="hint_master_refresh">祝日データとJMAエリアマスタをバックグラウンドで更新します。Wi‑Fiのみを有効にするとモバイル通信では更新しません。</string>
+    <string name="action_refresh_now">今すぐ更新</string>
+    <string name="action_refreshing">更新中…</string>
+    <string name="error_refresh_failed">更新に失敗しました</string>
+    <string name="label_holiday_last_updated">最終更新: %1$s</string>
+    <string name="label_holiday_last_updated_never">最終更新: 未取得</string>
+    <string name="label_master_last_updated">マスタ最終更新: %1$s</string>
+    <string name="label_master_auto_refresh">マスタ自動更新</string>
+    <string name="label_refresh_interval">更新間隔</string>
+    <string name="interval_weekly">毎週（7日）</string>
+    <string name="interval_biweekly">隔週（14日）</string>
+    <string name="interval_monthly">毎月（30日）</string>
+    <string name="toast_master_refreshed">マスタデータを更新しました</string>
 </resources>
 
 

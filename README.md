@@ -1,37 +1,60 @@
-# 祝天アラーム（ShukutenAlarm）
+# ShukutenAlarm
 
-祝日と天気を考慮する、Android向けの高機能アラームアプリです。
+Androidで祝日・天気に応じてサウンドを切り替えるアラームアプリです。
 
-日本の祝日を自動で判定し、休みの日にうっかりアラームが鳴ってしまうのを防ぎます。また、アラーム鳴動時にはその日の天気予報も表示し、快適な目覚めをサポートします。
+- 天気は気象庁（JMA）の予報API＋国土地理院（GSI）逆ジオコーディングを使用します。
+  - 仕様詳細: `docs/SPEC.md`
+  - 変更点サマリ: `docs/JMA_SPEC_UPDATE.md`
 
-家族の要望を受けて、Codex CLIの性能確認目的も兼ねつつVive Codingで作成しています。Playストア公開予定はありません。
+## 特徴
 
-## ✨ 主な機能
+- 祝日ポリシー（SKIP/DELAY/SAME）に対応
+- 現在地連動 または 都市名検索（ローカル）で予報エリアを決定
+- ETag/If-Modified-Since によるHTTPキャッシュ（area.json/forecast/{office}.json）
+- 次アラーム45分前（既定）に天気を先読みし、DataStoreへキャッシュ
+- ウィジェットで次回アラームを表示
 
-*   **祝日対応:** 内閣府が提供する祝日情報APIから最新の祝日を取得し、アラームを自動でスキップします。
-*   **天気予報:** Open-Meteo APIを利用し、指定した地域の天気予報をアラーム画面に表示します。
-*   **柔軟なアラーム設定:** 複数のアラームを登録し、曜日ごとの繰り返し設定が可能です。
-*   **サウンド選択:** デバイス内のサウンドを選択してアラーム音として設定できます。
-*   **自動再設定:** 端末を再起動しても、設定済みのアラームは自動で再スケジュールされます。
+## 技術スタック
 
-## 🛠️ 使用技術
+- UI: Jetpack Compose
+- アーキテクチャ: MVVM
+- DI: Hilt
+- 非同期: Kotlin Coroutines, WorkManager
+- データ永続化: Jetpack DataStore
+- ネットワーク: Retrofit2, OkHttp3, Kotlinx.Serialization
 
-このアプリは、モダンなAndroid開発のベストプラクティスに沿って構築されています。
+## ビルド手順
 
-*   **UI:** [Jetpack Compose](https://developer.android.com/jetpack/compose)
-*   **Architecture:** MVVM (Model-View-ViewModel)
-*   **Dependency Injection:** [Hilt](https://developer.android.com/training/dependency-injection/hilt-android)
-*   **Asynchronous:** [Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html), [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager)
-*   **Data Persistence:** [Jetpack DataStore](https://developer.android.com/topic/libraries/architecture/datastore)
-*   **Navigation:** [Navigation-Compose](https://developer.android.com/jetpack/compose/navigation)
-*   **Networking:** [Retrofit2](https://square.github.io/retrofit/), [OkHttp3](https://square.github.io/okhttp/), [Kotlinx.Serialization](https://github.com/Kotlin/kotlinx.serialization)
-*   **Media:** [Media3](https://developer.android.com/guide/topics/media/media3)
+1) クローン
+```
+git clone https://github.com/WhiteNoise0000/ShukutenAlarm.git
+```
+2) Android Studio で開く（Hedgehog 以降推奨）
+3) ビルド
+```
+./gradlew assembleDebug
+```
 
-## 🚀 ビルド方法
+## 使い方（要点）
 
-1.  このリポジトリをクローンします。
-    ```bash
-    git clone https://github.com/WhiteNoise0000/ShukutenAlarm.git
-    ```
-2.  [Android Studio](https://developer.android.com/studio) (Hedgehog以降) でプロジェクトを開きます。
-3.  Gradleの同期が完了したら、ビルドして実行します。
+- 設定画面で「都市名検索」または「現在地連動」を選択
+- 必要に応じて「今すぐ取得」で天気取得をテスト
+- アラーム編集で曜日/祝日ポリシー/サウンドを設定
+- 以降は次アラーム45分前に天気を自動先読みして鳴動時に反映
+
+## 権限
+
+- `ACCESS_COARSE_LOCATION`: 現在地連動で使用
+- `POST_NOTIFICATIONS`: Android 13+ の通知許可
+- `USE_FULL_SCREEN_INTENT`: 鳴動時のフルスクリーン表示
+- `RECEIVE_BOOT_COMPLETED`: 端末再起動後の再スケジュール
+- `INTERNET`: 天気/マスタデータの取得
+
+## テスト
+
+- 単体テスト: `./gradlew testDebugUnitTest`
+- 計測テスト: `./gradlew connectedAndroidTest`
+
+## ライセンス
+
+本リポジトリの LICENSE を参照してください。
