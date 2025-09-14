@@ -17,12 +17,23 @@ import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.CloudQueue
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Snooze
+import androidx.compose.material.icons.outlined.StopCircle
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,13 +41,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.integerResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +61,14 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import io.github.whitenoise0000.shukutenalarm.R
 import io.github.whitenoise0000.shukutenalarm.alarm.AlarmGateway
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
@@ -225,71 +247,168 @@ private fun RingingScreen(
             .fillMaxSize()
             .background(gradient)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = titleText,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+        // 中央にコンテンツを配置しつつ、背面に控えめなパルスを描画してモダンな雰囲気を演出
+        Box(Modifier.fillMaxSize()) {
+            // 背景パルス（ゆっくり拡大縮小する円）
+            val infinite = rememberInfiniteTransition(label = "pulse")
+            val scale by infinite.animateFloat(
+                initialValue = 0.92f,
+                targetValue = 1.08f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1600, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseAnim"
             )
-            if (alarmName.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = alarmName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            run {
-                val label = weatherLabel.ifBlank { stringResource(R.string.text_unknown) }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.label_weather_prefix, label),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            if (isHoliday) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = holidayName.ifBlank { stringResource(R.string.label_today_holiday) },
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            Spacer(Modifier.height(32.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Button(onClick = {
-                    // スヌーズ
-                    try { ringtonePlayer?.stop() } catch (_: Throwable) {}
-                    try { exoPlayer?.stop() } catch (_: Throwable) {}
-                    if (alarmId > 0) NotificationManagerCompat.from(context).cancel(alarmId)
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .align(Alignment.Center)
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f), CircleShape)
+            )
 
-                    scope.launch {
-                        val repo = DataStoreAlarmRepository(context)
-                        val spec: AlarmSpec? = withContext(Dispatchers.IO) { repo.load(alarmId) }
-                        spec?.let {
-                            val at = LocalDateTime.now().plusMinutes(snoozeMinutes.toLong())
-                            AlarmGateway(context).scheduleExactAlarm(
-                                it.copy(time = at.toLocalTime()),
-                                at.toLocalDate()
-                            )
-                        }
-                        onFinished()
+            // メインUI
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // タイトル + アイコン
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Alarm, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = titleText,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                // アラーム名（大きめ、2行上限）
+                if (alarmName.isNotBlank()) {
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = alarmName,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 2
+                    )
+                }
+
+                // 天気・祝日の情報ピル（チップより大きく視認性の高い表示）
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val weather = weatherLabel.ifBlank { stringResource(R.string.text_unknown) }
+                    InfoPill(
+                        icon = Icons.Outlined.CloudQueue,
+                        text = weather,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    if (isHoliday) {
+                        InfoPill(
+                            icon = Icons.Outlined.Event,
+                            text = holidayName.ifBlank { stringResource(R.string.label_today_holiday) },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
-                }) { Text(stringResource(R.string.action_snooze)) }
+                }
 
-                Button(onClick = {
-                    try { ringtonePlayer?.stop() } catch (_: Throwable) {}
-                    try { exoPlayer?.stop() } catch (_: Throwable) {}
-                    if (alarmId > 0) NotificationManagerCompat.from(context).cancel(alarmId)
-                    onFinished()
-                }) { Text(stringResource(R.string.action_stop)) }
+                Spacer(Modifier.height(36.dp))
+
+                // 操作用ボタン（STOPを強調、SNOOZEはトーナル）
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            // スヌーズ処理（既定分だけ後ろへずらして再登録）
+                            try { ringtonePlayer?.stop() } catch (_: Throwable) {}
+                            try { exoPlayer?.stop() } catch (_: Throwable) {}
+                            if (alarmId > 0) NotificationManagerCompat.from(context).cancel(alarmId)
+
+                            scope.launch {
+                                val repo = DataStoreAlarmRepository(context)
+                                val spec: AlarmSpec? = withContext(Dispatchers.IO) { repo.load(alarmId) }
+                                spec?.let {
+                                    val at = LocalDateTime.now().plusMinutes(snoozeMinutes.toLong())
+                                    AlarmGateway(context).scheduleExactAlarm(
+                                        it.copy(time = at.toLocalTime()),
+                                        at.toLocalDate()
+                                    )
+                                }
+                                onFinished()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors()
+                    ) {
+                        Icon(Icons.Outlined.Snooze, contentDescription = null, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.action_snooze), style = MaterialTheme.typography.titleLarge)
+                    }
+
+                    Button(
+                        onClick = {
+                            // 停止処理（最優先で目立つ配色）
+                            try { ringtonePlayer?.stop() } catch (_: Throwable) {}
+                            try { exoPlayer?.stop() } catch (_: Throwable) {}
+                            if (alarmId > 0) NotificationManagerCompat.from(context).cancel(alarmId)
+                            onFinished()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Icon(Icons.Outlined.StopCircle, contentDescription = null, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.action_stop), style = MaterialTheme.typography.titleLarge)
+                    }
+                }
             }
+        }
+    }
+}
+
+/**
+ * 情報ピル（大きめのラベル表示）。
+ * - アイコン＋テキストを丸みのあるサーフェス上に表示し、視認性を高める。
+ */
+@Composable
+private fun InfoPill(
+    icon: ImageVector,
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(28.dp),
+        color = containerColor.copy(alpha = 0.24f),
+        contentColor = contentColor
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.size(10.dp))
+            Text(text = text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, maxLines = 2)
         }
     }
 }

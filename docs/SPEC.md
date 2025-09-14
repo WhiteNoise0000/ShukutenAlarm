@@ -58,7 +58,9 @@
 ## 5. 永続化（DataStore）
 
 - キー定義: `app/src/main/java/.../data/PreferencesKeys.kt`
-- 天気キャッシュ: `KEY_LAST_WEATHER_JSON`（`{"timestamp":epoch, "category":"..."}`）
+- 天気キャッシュ: `KEY_LAST_WEATHER_JSON`
+  - 旧: `{"timestamp":epoch, "category":"..."}`
+  - 新: `{"timestamp":epoch, "category":"...", "text":"くもり時々雨"}`（JMA文言をそのまま保存。無い場合は省略）
 - 祝日最終取得: `KEY_HOLIDAYS_LAST_FETCH`
 - 都市選択: `KEY_SELECTED_OFFICE`, `KEY_SELECTED_CLASS10`
 

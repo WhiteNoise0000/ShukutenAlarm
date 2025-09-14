@@ -464,7 +464,8 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                                     val constApi = jmaRetrofit.create(JmaConstApi::class.java)
                                     val areaRepo = AreaRepository(context, constApi)
                                     val repo = WeatherRepository(context, forecastApi, gsiApi, areaRepo)
-                                    val cat = withContext(Dispatchers.IO) {
+                                    // 取得結果をスナップショット（カテゴリ＋JMA文言）として受け取り、文言優先で表示する
+                                    val snap = withContext(Dispatchers.IO) {
                                         if (useCur) {
                                             repo.prefetchByCurrentLocation(latUsed, lonUsed)
                                         } else {
@@ -472,8 +473,11 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                                             if (office.isNullOrBlank()) null else repo.prefetchByOffice(office, selectedClass10.value)
                                         }
                                     }
-                                    if (cat != null) {
-                                        val label = cat.getLabel(context)
+                                    if (snap != null) {
+                                        val labelRaw = snap.text?.ifBlank { null }
+                                            ?: snap.category?.getLabel(context)
+                                            ?: context.getString(R.string.text_unknown)
+                                        val label = normalizeWeatherTextForDisplay(labelRaw)
                                         val msg =
                                             context.getString(R.string.toast_weather_fetched, label)
                                         weatherTestMessage.value = msg

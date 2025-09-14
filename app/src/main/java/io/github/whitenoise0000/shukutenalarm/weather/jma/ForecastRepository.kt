@@ -36,6 +36,27 @@ class ForecastRepository(
         return null
     }
 
+    /**
+     * 指定office/class10に対し、先頭の予報カテゴリとJMA文言（可能な場合）を取得する。
+     * - weathers が存在すればその先頭を text として返し、カテゴリは文言から正規化
+     * - 無い場合は weatherCodes からカテゴリを判定し、text は null
+     */
+    suspend fun fetchCategoryAndText(office: String, class10: String): io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot {
+        val roots = api.forecast(office)
+        for (root in roots) {
+            for (ts in root.timeSeries) {
+                val area = ts.areas.firstOrNull { it.area.code == class10 }
+                if (area != null) {
+                    val text = area.weathers?.firstOrNull()?.trim()
+                    val cat = text?.let { mapWeatherTextToCategory(it) }
+                        ?: area.weatherCodes?.firstOrNull()?.let { mapWeatherCodeToCategory(it) }
+                    return io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot(cat, text)
+                }
+            }
+        }
+        return io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot(null, null)
+    }
+
     /** DataStoreへ直近カテゴリをJSONで保存。*/
     suspend fun cacheCategory(category: WeatherCategory?) = withContext(Dispatchers.IO) {
         val key = stringPreferencesKey(PreferencesKeys.KEY_LAST_WEATHER_JSON)
@@ -43,6 +64,24 @@ class ForecastRepository(
         val value = category?.name ?: ""
         val text = "{\"timestamp\":$now,\"category\":\"$value\"}"
         context.appDataStore.edit { prefs -> prefs[key] = text }
+    }
+
+    /**
+     * DataStoreへ直近カテゴリとJMA文言をJSONで保存。
+     * - 互換性のため従来のキーに text を追加（無い場合でも安全に読み出せる構造）。
+     *   例: {"timestamp": 0, "category": "CLOUDY", "text": "くもり時々雨"}
+     */
+    suspend fun cacheSnapshot(category: WeatherCategory?, jmaText: String?) = withContext(Dispatchers.IO) {
+        val key = stringPreferencesKey(PreferencesKeys.KEY_LAST_WEATHER_JSON)
+        val now = System.currentTimeMillis()
+        val value = category?.name ?: ""
+        val safeText = jmaText?.replace("\\", "\\\\")?.replace("\"", "\\\"")
+        val json = if (safeText != null) {
+            "{\"timestamp\":$now,\"category\":\"$value\",\"text\":\"$safeText\"}"
+        } else {
+            "{\"timestamp\":$now,\"category\":\"$value\"}"
+        }
+        context.appDataStore.edit { prefs -> prefs[key] = json }
     }
 
     companion object {

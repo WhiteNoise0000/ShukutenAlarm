@@ -23,6 +23,7 @@ import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
 import io.github.whitenoise0000.shukutenalarm.ui.RingingActivity
 import io.github.whitenoise0000.shukutenalarm.ui.getLabel
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
+import io.github.whitenoise0000.shukutenalarm.ui.normalizeWeatherTextForDisplay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -76,9 +77,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
-                // キャッシュされた天気 → 未取得なら最大10秒で再取得
-                val cached = readCachedWeather(context)
-                Log.d("AlarmReceiver", "Cached weather: $cached")
+                // キャッシュされた天気（カテゴリ＋JMA文言）→ 未取得なら最大10秒で再取得
+                val cached = readCachedWeatherSnapshot(context)
+                Log.d("AlarmReceiver", "Cached weather snapshot: $cached")
                 val weather = cached ?: runCatching {
                     Log.d("AlarmReceiver", "Attempting to fetch weather with timeout...")
                     fetchWeatherWithTimeout(
@@ -86,7 +87,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         timeoutMillis = 10_000
                     )
                 }.getOrNull()
-                Log.d("AlarmReceiver", "Final weather after fetch attempt: $weather")
+                Log.d("AlarmReceiver", "Final weather snapshot after fetch attempt: $weather")
 
                 // 鳴動画面へ渡す情報
                 val activityIntent = Intent(context, RingingActivity::class.java).apply {
@@ -96,14 +97,18 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("id", id)
                     putExtra(
                         "soundUri",
-                        SoundSelector.selectSound(spec, weather) {
+                        SoundSelector.selectSound(spec, weather?.category) {
                             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                                 ?: Settings.System.DEFAULT_ALARM_ALERT_URI
                         }.toString()
                     )
-                    // 天気ラベルはユーザ向けにローカライズした文字列を渡す
-                    val weatherLabel = weather?.getLabel(context) ?: ""
+                    // 天気ラベルは「気象庁発表文言をそのまま優先」。無い場合はカテゴリのローカライズ文字列でフォールバック。
+                    val weatherLabel = normalizeWeatherTextForDisplay(
+                        weather?.text?.ifBlank { null }
+                            ?: weather?.category?.getLabel(context)
+                            ?: ""
+                    )
                     Log.d("AlarmReceiver", "Weather label being put into intent: $weatherLabel")
                     putExtra("weatherLabel", weatherLabel)
                     putExtra("isHoliday", isHolidayToday)
@@ -146,21 +151,26 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
-    /** DataStore のキャッシュから天気カテゴリを読み出す。*/
-    private fun readCachedWeather(context: Context): WeatherCategory? = runBlocking {
+    /**
+     * DataStore のキャッシュから天気スナップショット（カテゴリ＋JMA文言）を読み出す。
+     * - 旧バージョンのJSON（categoryのみ）も後方互換で読み出す。
+     */
+    private fun readCachedWeatherSnapshot(context: Context): io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot? = runBlocking {
         val key = stringPreferencesKey(PreferencesKeys.KEY_LAST_WEATHER_JSON)
         val text = context.appDataStore.data.map { prefs -> prefs[key] }.first()
         text?.let {
             runCatching {
                 val obj = JSONObject(it)
-                val cat = obj.optString("category", "").ifBlank {
-                    Log.d("AlarmReceiver", "readCachedWeather: category is blank.")
-                    return@runCatching null
+                val catName = obj.optString("category", "").trim()
+                val textLabel = obj.optString("text", "").trim().ifBlank { null }
+                val cat = catName.ifBlank {
+                    Log.d("AlarmReceiver", "readCachedWeatherSnapshot: category is blank.")
+                    null
+                }?.let { name ->
+                    runCatching { WeatherCategory.valueOf(name) }.getOrNull()
                 }
-                Log.d("AlarmReceiver", "readCachedWeather: category string = $cat")
-                val weatherCategory = WeatherCategory.valueOf(cat)
-                Log.d("AlarmReceiver", "readCachedWeather: parsed WeatherCategory = $weatherCategory")
-                weatherCategory
+                Log.d("AlarmReceiver", "readCachedWeatherSnapshot: parsed = cat=$cat, text=$textLabel")
+                io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot(cat, textLabel)
             }.getOrNull()
         }
     }
@@ -174,7 +184,7 @@ class AlarmReceiver : BroadcastReceiver() {
     private suspend fun fetchWeatherWithTimeout(
         context: Context,
         timeoutMillis: Long
-    ): WeatherCategory? = withTimeout(timeoutMillis) {
+    ): io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot? = withTimeout(timeoutMillis) {
         Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Entering withTimeout block.")
         val result = withContext(Dispatchers.IO) {
             val settings = SettingsRepository(context).settingsFlow.first()
@@ -223,14 +233,14 @@ class AlarmReceiver : BroadcastReceiver() {
             val constApi = jmaRetrofit.create(io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi::class.java)
             val areaRepo = io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository(context, constApi)
             val repo = io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository(context, forecastApi, gsiApi, areaRepo)
-            val fetchedCategory = if (settings.useCurrentLocation) {
+            val fetched = if (settings.useCurrentLocation) {
                 repo.prefetchByCurrentLocation(lat, lon)
             } else {
                 val office = settings.selectedOffice
                 if (office.isNullOrBlank()) null else repo.prefetchByOffice(office, settings.selectedClass10)
             }
-            Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Fetched category = $fetchedCategory")
-            fetchedCategory
+            Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Fetched snapshot = $fetched")
+            fetched
         }
         Log.d("AlarmReceiver", "fetchWeatherWithTimeout: Exiting withTimeout block. Result = $result")
         result
