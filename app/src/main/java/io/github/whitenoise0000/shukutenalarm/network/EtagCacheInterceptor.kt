@@ -4,7 +4,7 @@ import android.content.Context
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Response
-import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 /**
  * ETag/If-Modified-Sinceによる条件付き取得と304時のキャッシュ復元を行うOkHttpインターセプタ。
@@ -45,7 +45,7 @@ class EtagCacheInterceptor(
                 .code(200)
                 .message("OK (from cache)")
                 .header("X-Cache-Hit", "true")
-                .body(ResponseBody.create(mediaType, entry.body))
+                .body(entry.body.toResponseBody(mediaType))
                 .build()
         }
 
@@ -58,7 +58,7 @@ class EtagCacheInterceptor(
             // 読み取り済のためボディを再構築
             val mediaType = res.body?.contentType() ?: "application/json; charset=utf-8".toMediaTypeOrNull()
             return res.newBuilder()
-                .body(ResponseBody.create(mediaType, bodyStr))
+                .body(bodyStr.toResponseBody(mediaType))
                 .build()
         }
         return res
