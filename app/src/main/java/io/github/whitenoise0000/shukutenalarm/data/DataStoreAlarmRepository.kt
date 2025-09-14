@@ -42,4 +42,22 @@ class DataStoreAlarmRepository(private val context: Context) {
         }
         return out.sortedBy { it.id }
     }
+
+    /**
+     * アラームを複製する。新しいIDを割り当て、名前を変更して保存する。
+     * @param originalId 複製元のアラームID
+     * @return 新しいアラームのID、複製に失敗した場合はnull
+     */
+    suspend fun duplicate(originalId: Int): Int? {
+        val original = load(originalId) ?: return null
+        val existingIds = list().map { it.id }
+        val newId = (existingIds.maxOrNull() ?: 0) + 1
+        val duplicated = original.copy(
+            id = newId,
+            name = if (original.name.isBlank()) "コピー" else "コピー - ${original.name}",
+            enabled = false // 複製時はデフォルトで無効
+        )
+        save(duplicated)
+        return newId
+    }
 }

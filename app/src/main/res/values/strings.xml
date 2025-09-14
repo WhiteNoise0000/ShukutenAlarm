@@ -29,6 +29,7 @@
     <string name="text_cancel">キャンセル</string>
     <string name="action_delete">削除</string>
     <string name="action_edit">編集</string>
+    <string name="action_duplicate">コピー</string>
     <string name="action_pick_time">時刻を選択</string>
     <string name="action_preview">プレビュー</string>
     <string name="action_stop">停止</string>
@@ -104,6 +105,7 @@
     <string name="toast_alarm_deleted">アラームを削除しました</string>
     <string name="toast_alarm_enabled">アラームを有効にしました</string>
     <string name="toast_alarm_disabled">アラームを無効にしました</string>
+    <string name="toast_alarm_duplicated">アラームをコピーしました</string>
     <string name="toast_settings_saved">設定を保存しました</string>
     <string name="toast_city_selected">都市を選択しました</string>
 
