@@ -36,10 +36,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        // Kotlin/JVM 17 を使用
-        jvmTarget = "17"
-    }
+
     buildFeatures {
         // Jetpack Compose を有効化
         compose = true
