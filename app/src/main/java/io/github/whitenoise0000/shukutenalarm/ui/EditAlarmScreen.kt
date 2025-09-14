@@ -73,6 +73,7 @@ import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
 import io.github.whitenoise0000.shukutenalarm.data.model.HolidayPolicy
 import io.github.whitenoise0000.shukutenalarm.data.model.VolumeMode
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
+import io.github.whitenoise0000.shukutenalarm.data.model.RepeatType
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import kotlinx.coroutines.Dispatchers
@@ -104,6 +105,8 @@ fun EditAlarmScreen(
     val hour = remember { mutableStateOf("7") }
     val minute = remember { mutableStateOf("0") }
     val policy = remember { mutableStateOf(HolidayPolicy.SAME) }
+    // 繰り返し種別（週ごと / 1回のみ）
+    val repeatType = remember { mutableStateOf(RepeatType.WEEKLY) }
     val volumeModeState = remember { mutableStateOf(VolumeMode.SYSTEM) }
     val volumePercentState = remember { mutableFloatStateOf(100f) }
     val vibrateState = remember { mutableStateOf(false) }
@@ -167,6 +170,7 @@ fun EditAlarmScreen(
                 soundMap[k] = it.soundMapping[k]
             }
                 holidaySound.value = it.holidaySound
+                repeatType.value = it.repeatType
                 val selected = it.daysOfWeek
                 val new = listOf(
                     DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
@@ -183,6 +187,15 @@ fun EditAlarmScreen(
         val m = minute.value.toIntOrNull()?.coerceIn(0, 59) ?: 0
         val time = LocalTime.of(h, m)
         val selectedDays = days.filter { it.second }.map { it.first }.toSet()
+        // バリデーション: 祝日のみ以外では曜日を1つ以上必須
+        if (!holidayOnly.value && selectedDays.isEmpty()) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.error_days_required),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         val spec = AlarmSpec(
             id = alarmId ?: (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
             name = nameState.value.trim(),
@@ -197,7 +210,8 @@ fun EditAlarmScreen(
             prefetchMinutes = 45,
             soundMapping = soundMap.filterValues { it != null }.mapValues { it.value!! },
             holidaySound = holidaySound.value,
-            enabled = true
+            enabled = true,
+            repeatType = repeatType.value
         )
         scope.launch {
             withContext(Dispatchers.IO) { repo.save(spec) }
@@ -282,6 +296,48 @@ fun EditAlarmScreen(
                             }, h, m, true).show()
                         }) { Text(stringResource(R.string.action_pick_time)) }
                     }
+                }
+            }
+        }
+
+        // 繰り返し（週ごと / 1回のみ）
+        OutlinedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.label_repeat),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val opts = listOf(RepeatType.WEEKLY, RepeatType.ONE_SHOT)
+                    opts.forEachIndexed { index, rt ->
+                        val shape = SegmentedButtonDefaults.itemShape(index, opts.size)
+                        val selected = repeatType.value == rt
+                        val label = when (rt) {
+                            RepeatType.WEEKLY -> stringResource(R.string.repeat_weekly)
+                            RepeatType.ONE_SHOT -> stringResource(R.string.repeat_one_shot)
+                        }
+                        SegmentedButton(
+                            modifier = Modifier.weight(1f),
+                            selected = selected,
+                            onClick = { repeatType.value = rt },
+                            shape = shape,
+                            label = {
+                                Text(
+                                    label,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                    }
+                }
+                if (repeatType.value == RepeatType.ONE_SHOT) {
+                    Text(
+                        text = stringResource(R.string.repeat_one_shot_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

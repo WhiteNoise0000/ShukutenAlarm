@@ -9,6 +9,7 @@ Androidで祝日・天気に応じてサウンドを切り替えるアラーム�
 ## 特徴
 
 - 祝日ポリシー（SKIP/DELAY/SAME）に対応
+- 繰り返し: 週ごと/1回のみ（ONE_SHOT）に対応。1回のみは曜日設定に従い最短の1回だけ鳴動し、鳴動後は自動無効化。
 - 現在地連動 または 都市名検索（ローカル）で予報エリアを決定
 - ETag/If-Modified-Since によるHTTPキャッシュ（area.json/forecast/{office}.json）
 - 次アラーム45分前（既定）に天気を先読みし、DataStoreへキャッシュ

@@ -55,8 +55,21 @@ data class AlarmSpec(
     /** デフォルトサウンド（天気別が未設定時のフォールバック）。既存互換のためプロパティ名は holidaySound を流用。 */
     @Serializable(with = UriSerializer::class)
     val holidaySound: Uri? = null,
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    /**
+     * 繰り返し種別。
+     * - WEEKLY: 週ごと（従来どおり曜日ベースで繰り返し）
+     * - ONE_SHOT: 1回のみ（曜日に従い最短の1回だけ鳴動し、自動で無効化）
+     */
+    val repeatType: RepeatType = RepeatType.WEEKLY
 )
+
+/**
+ * 繰り返し種別の列挙。
+ * - 既定は WEEKLY（後方互換）。
+ */
+@Serializable
+enum class RepeatType { WEEKLY, ONE_SHOT }
 
 /**
  * WMOコードから天気カテゴリへ変換する拡張関数。

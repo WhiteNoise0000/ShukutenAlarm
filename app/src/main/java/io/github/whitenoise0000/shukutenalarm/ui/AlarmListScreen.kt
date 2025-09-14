@@ -54,6 +54,7 @@ import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
 import io.github.whitenoise0000.shukutenalarm.data.model.HolidayPolicy
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
+import io.github.whitenoise0000.shukutenalarm.data.model.RepeatType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -282,7 +283,7 @@ private fun AlarmCard(
                 Text(
                     text = spec.time.formatHHMM(),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    // 時刻を可変幅にして、右側の操作アイコン群との競合を避ける
+                    // 時刻はカードの主役とし、右側の操作アイコン群とのレイアウト競合を避けるため可変幅にする
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onDuplicate) {
@@ -384,14 +385,24 @@ private fun AlarmCard(
             }
 
             RowAlignCenter {
-                Text(stringResource(R.string.label_enabled_toggle), modifier = Modifier.weight(1f))
-                val checked = remember { mutableStateOf(spec.enabled) }
-                val enabledState = checked
+                // 有効/無効のラベルはスイッチ状態とONE_SHOT設定に応じて動的に表示する。
+                // - 有効時: 「有効」＋ ONE_SHOT の場合は「（1回のみ）」をサフィックス表示
+                // - 無効時: 「無効」
+                val checked = remember(spec.id, refreshKey) { mutableStateOf(spec.enabled) }
+                LaunchedEffect(spec.enabled, refreshKey) { checked.value = spec.enabled }
+                val baseEnabled = stringResource(R.string.label_enabled_toggle)
+                val disabled = stringResource(R.string.label_disabled_toggle)
+                val oneshotSuffix = stringResource(R.string.label_one_shot_suffix)
+                val label = if (checked.value) {
+                    if (spec.repeatType == RepeatType.ONE_SHOT) baseEnabled + oneshotSuffix else baseEnabled
+                } else {
+                    disabled
+                }
+                Text(label, modifier = Modifier.weight(1f))
                 Switch(
                     checked = checked.value,
                     onCheckedChange = { enabled ->
                         checked.value = enabled
-                        enabledState.value = enabled
                         onToggle(enabled)
                     }
                 )

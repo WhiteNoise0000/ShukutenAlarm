@@ -23,6 +23,7 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             val list = runCatching { repo.list() }.getOrElse { emptyList() }
             LocalDateTime.now()
+            // 有効なもののみ再登録（ONE_SHOTで既に鳴動済み→enabled=false なら再登録されない）
             list.filter { it.enabled }.forEach { spec ->
                 scheduler.scheduleNext(spec)
             }

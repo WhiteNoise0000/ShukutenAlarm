@@ -17,7 +17,9 @@
     <string name="label_vibrate">バイブレーション</string>
     <string name="label_respect_silent">マナー/サイレントに従う</string>
     <string name="label_enabled_toggle">有効</string>
+    <string name="label_disabled_toggle">無効</string>
     <string name="label_holiday_only">祝日のみ鳴動</string>
+    <string name="label_repeat">繰り返し</string>
     <string name="label_delay_minutes_holiday">祝日DELAY（分）</string>
     <string name="label_wifi_only">Wi‑Fiのみで更新</string>
     <string name="label_today_holiday">今日は祝日です</string>
@@ -56,6 +58,10 @@
     <string name="policy_same">同じ</string>
     <string name="policy_delay">遅らせる</string>
     <string name="policy_skip">スキップ</string>
+    <!-- 繰り返し（週ごと/1回のみ） -->
+    <string name="repeat_weekly">週ごと</string>
+    <string name="repeat_one_shot">1回のみ</string>
+    <string name="repeat_one_shot_hint">曜日設定に従い、最短の1回だけ鳴動します</string>
 
     <!-- 音量モード -->
     <string name="volume_mode_default">デフォルト</string>
@@ -77,6 +83,7 @@
     <string name="error_empty_query">都市名を入力してください</string>
     <string name="error_no_results">検索結果が見つかりません。表記ゆれに注意し、市/区の正式名称でお試しください。</string>
     <string name="error_network_generic">通信に失敗しました。ネットワーク状態を確認してください</string>
+    <string name="error_days_required">曜日を1つ以上選択してください</string>
 
     <!-- 曜日/天気 -->
     <string name="dow_mon">月</string>
@@ -129,6 +136,8 @@
     <string name="interval_biweekly">隔週（14日）</string>
     <string name="interval_monthly">毎月（30日）</string>
     <string name="toast_master_refreshed">マスタデータを更新しました</string>
+    <!-- 表示: 一覧の1回のみラベル -->
+    <string name="label_one_shot_suffix">（1回）</string>
 </resources>
 
 

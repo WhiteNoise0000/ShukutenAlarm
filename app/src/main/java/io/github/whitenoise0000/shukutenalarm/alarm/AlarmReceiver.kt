@@ -17,6 +17,7 @@ import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
 import io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.WeatherCategory
+import io.github.whitenoise0000.shukutenalarm.data.model.RepeatType
 import io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository
 import io.github.whitenoise0000.shukutenalarm.platform.Notifications
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
@@ -136,8 +137,15 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
 
 
-                // 次回をスケジュール
-                ScheduleManager(context).scheduleNext(spec)
+                // 次回をスケジュール（ONE_SHOT は鳴動後に自動無効化するため再登録しない）
+                if (spec.repeatType == RepeatType.ONE_SHOT) {
+                    // 1回のみ: 鳴動後は無効化して保存（一覧に残し、再起動時も再登録されない）
+                    withContext(Dispatchers.IO) {
+                        repo.save(spec.copy(enabled = false))
+                    }
+                } else {
+                    ScheduleManager(context).scheduleNext(spec)
+                }
                 // ウィジェットへ更新通知
                 context.sendBroadcast(
                     Intent(
