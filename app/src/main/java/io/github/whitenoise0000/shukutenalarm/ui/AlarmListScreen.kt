@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Snooze
@@ -143,6 +144,28 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
                     AlarmCard(
                         spec = spec,
                         onEdit = { onEdit(spec.id) },
+                        onDuplicate = {
+                            scope.launch {
+                                val newId = withContext(Dispatchers.IO) { repo.duplicate(spec.id) }
+                                if (newId != null) {
+                                    val items = withContext(Dispatchers.IO) { repo.list() }
+                                    val sorted = items.sortedBy { it.time }
+                                    list.clear(); list.addAll(sorted)
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.toast_alarm_duplicated),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    // ウィジェットへ更新通知（一覧変化）
+                                    context.sendBroadcast(
+                                        Intent(
+                                            context,
+                                            NextAlarmWidgetProvider::class.java
+                                        ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
+                                    )
+                                }
+                            }
+                        },
                         onDelete = {
                             scope.launch {
                                 val items = withContext(Dispatchers.IO) {
@@ -202,6 +225,7 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
 private fun AlarmCard(
     spec: AlarmSpec,
     onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
     onDelete: () -> Unit,
     onToggle: (Boolean) -> Unit,
     /** 画面復帰や手動更新に同期して再計算するためのトリガ。*/
@@ -237,25 +261,36 @@ private fun AlarmCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // アラーム名は設定がある場合のみ、1行目に独立表示して見切れを防ぐ
+            if (spec.name.isNotBlank()) {
+                Text(
+                    text = spec.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
             RowAlignCenter {
                 Icon(
                     Icons.Outlined.Alarm,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
-                @SuppressLint("DefaultLocale")
+                
                 Text(
                     text = spec.time.formatHHMM(),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    // 時刻を可変幅にして、右側の操作アイコン群との競合を避ける
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = spec.name.takeIf { it.isNotBlank() } ?: "",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                IconButton(onClick = onDuplicate) {
+                    Icon(
+                        Icons.Outlined.ContentCopy,
+                        contentDescription = stringResource(R.string.action_duplicate)
+                    )
+                }
                 IconButton(onClick = onEdit) {
                     Icon(
                         Icons.Outlined.Edit,
