@@ -547,7 +547,10 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 )
                 // クイックプリセット
-                val presets = listOf(0, 30, 60, 90, 120)
+                // Issue #12 対応: Pixel 8a 実機で末尾の「120分」チップが見切れてしまう不具合があるため
+                // プリセットから 120 を除外し、0/30/60/90 の4つに限定する。
+                // スライダーは従来通り 0..180 を維持するため、必要な場合はスライダーから 120 分も選択可能。
+                val presets = listOf(0, 30, 60, 90)
                 RowAlignCenter {
                     presets.forEach { m ->
                         FilterChip(
