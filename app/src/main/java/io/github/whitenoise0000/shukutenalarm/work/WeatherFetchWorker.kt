@@ -76,10 +76,11 @@ class WeatherFetchWorker(
                 .addConverterFactory(json.asConverterFactory(contentType))
                 .build()
             val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
-            val gsiApi = gsiRetrofit.create(GsiApi::class.java)
+                        val gsiApi = gsiRetrofit.create(GsiApi::class.java)
             val constApi = jmaRetrofit.create(JmaConstApi::class.java)
             val areaRepo = AreaRepository(applicationContext, constApi)
-            val repo = WeatherRepository(applicationContext, forecastApi, gsiApi, areaRepo)
+            val telopsRepo = io.github.whitenoise0000.shukutenalarm.weather.jma.TelopsRepository(applicationContext)
+            val repo = WeatherRepository(applicationContext, forecastApi, gsiApi, areaRepo, telopsRepo)
             if (settings.useCurrentLocation) {
                 repo.prefetchByCurrentLocation(lat, lon)
             } else {

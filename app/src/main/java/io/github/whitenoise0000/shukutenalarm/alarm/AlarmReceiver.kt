@@ -240,7 +240,8 @@ class AlarmReceiver : BroadcastReceiver() {
             val gsiApi = gsiRetrofit.create(io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi::class.java)
             val constApi = jmaRetrofit.create(io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi::class.java)
             val areaRepo = io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository(context, constApi)
-            val repo = io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository(context, forecastApi, gsiApi, areaRepo)
+            val telopsRepo = io.github.whitenoise0000.shukutenalarm.weather.jma.TelopsRepository(context)
+            val repo = io.github.whitenoise0000.shukutenalarm.weather.WeatherRepository(context, forecastApi, gsiApi, areaRepo, telopsRepo)
             val fetched = if (settings.useCurrentLocation) {
                 repo.prefetchByCurrentLocation(lat, lon)
             } else {

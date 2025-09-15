@@ -13,6 +13,7 @@ import io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository
 import io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.TelopsRepository
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -73,7 +74,7 @@ object AppModule {
     @Provides @Singleton fun provideJmaConstApi(jmaRetrofit: Retrofit): JmaConstApi = jmaRetrofit.create()
     @Provides @Singleton fun provideJmaForecastApi(jmaRetrofit: Retrofit): JmaForecastApi = jmaRetrofit.create()
     @Provides @Singleton fun provideGsiApi(gsiRetrofit: Retrofit): GsiApi = gsiRetrofit.create()
-
+    
     /** Repositories */
     @Provides
     @Singleton
@@ -87,6 +88,12 @@ object AppModule {
         forecastApi: JmaForecastApi,
         gsiApi: GsiApi,
         areaRepository: AreaRepository
-    ): WeatherRepository = WeatherRepository(context, forecastApi, gsiApi, areaRepository)
+    ): WeatherRepository = WeatherRepository(
+        context,
+        forecastApi,
+        gsiApi,
+        areaRepository,
+        TelopsRepository(context)
+    )
 }
 

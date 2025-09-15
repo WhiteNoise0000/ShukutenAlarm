@@ -66,6 +66,7 @@ import io.github.whitenoise0000.shukutenalarm.weather.jma.AreaRepository
 import io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaConstApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
+import io.github.whitenoise0000.shukutenalarm.weather.jma.TelopsRepository
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import io.github.whitenoise0000.shukutenalarm.work.MasterRefreshScheduler
 import kotlinx.coroutines.Dispatchers
@@ -460,10 +461,11 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                                         .addConverterFactory(json.asConverterFactory(contentType))
                                         .build()
                                     val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
-                                    val gsiApi = gsiRetrofit.create(GsiApi::class.java)
+                                                                        val gsiApi = gsiRetrofit.create(GsiApi::class.java)
                                     val constApi = jmaRetrofit.create(JmaConstApi::class.java)
                                     val areaRepo = AreaRepository(context, constApi)
-                                    val repo = WeatherRepository(context, forecastApi, gsiApi, areaRepo)
+                                    val telopsRepo = TelopsRepository(context)
+                                    val repo = WeatherRepository(context, forecastApi, gsiApi, areaRepo, telopsRepo)
                                     // 取得結果をスナップショット（カテゴリ＋JMA文言）として受け取り、文言優先で表示する
                                     val snap = withContext(Dispatchers.IO) {
                                         if (useCur) {

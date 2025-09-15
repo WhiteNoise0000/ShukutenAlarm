@@ -50,6 +50,8 @@ class MasterRefreshWorker(
             val constApi = jmaRetrofit.create(JmaConstApi::class.java)
             val areaRepo = AreaRepository(applicationContext, constApi)
             areaRepo.refreshMaster()
+
+            // TELOPS はローカルアセット/キャッシュのみ利用（オンライン更新は無効化）
             Result.success()
         } catch (_: Exception) {
             Result.retry()

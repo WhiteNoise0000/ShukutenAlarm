@@ -16,7 +16,8 @@ import kotlinx.coroutines.withContext
  */
 class ForecastRepository(
     private val context: Context,
-    private val api: JmaForecastApi
+    private val api: JmaForecastApi,
+    private val telopsRepo: TelopsRepository
 ) {
 
     /** 指定office/class10に対し、先頭の予報カテゴリを取得する。*/
@@ -47,9 +48,15 @@ class ForecastRepository(
             for (ts in root.timeSeries) {
                 val area = ts.areas.firstOrNull { it.area.code == class10 }
                 if (area != null) {
-                    val text = area.weathers?.firstOrNull()?.trim()
-                    val cat = text?.let { mapWeatherTextToCategory(it) }
-                        ?: area.weatherCodes?.firstOrNull()?.let { mapWeatherCodeToCategory(it) }
+                    // 優先: weatherCodes → TELOPS 変換
+                    val code = area.weatherCodes?.firstOrNull()?.trim()
+                    val telops = code?.let { c ->
+                        runCatching { telopsRepo.getTelopsMap()[c] }.getOrNull()
+                    }
+                    val text = telops?.takeIf { it.isNotBlank() }
+                        ?: area.weathers?.firstOrNull()?.trim()
+                    val cat = code?.let { mapWeatherCodeToCategory(it) }
+                        ?: text?.let { mapWeatherTextToCategory(it) }
                     return io.github.whitenoise0000.shukutenalarm.weather.WeatherSnapshot(cat, text)
                 }
             }

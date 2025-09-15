@@ -12,6 +12,23 @@ interface JmaConstApi {
     suspend fun area(): AreaMaster
 }
 
+/**
+ * 気象庁 予報定数API（forecast.json）のRetrofitインターフェース。
+ * - weatherCodes → telops（定型文）への対応付けを保持
+ */
+interface JmaForecastConstApi {
+    @GET("/bosai/forecast/const/forecast.json")
+    suspend fun forecastConst(): ForecastConst
+}
+
+/** forecast.json のルート。必要最小限のフィールドのみ定義。*/
+@Serializable
+data class ForecastConst(
+    // 天気コード配列（100, 101, ...）とテロップ配列（"晴れ", ...）は同インデックス対応
+    @SerialName("weatherCodes") val weatherCodes: List<String> = emptyList(),
+    @SerialName("telops") val telops: List<String> = emptyList()
+)
+
 /** area.json のルート。必要最小限のフィールドのみ定義。*/
 @Serializable
 data class AreaMaster(
@@ -51,4 +68,3 @@ data class Class20Entry(
     /** 親（class10内のエリアコード。例: 130011 など） */
     val parent: String
 )
-

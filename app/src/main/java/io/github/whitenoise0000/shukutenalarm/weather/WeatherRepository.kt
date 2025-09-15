@@ -7,6 +7,7 @@ import io.github.whitenoise0000.shukutenalarm.weather.jma.ForecastRepository
 import io.github.whitenoise0000.shukutenalarm.weather.jma.GsiApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaMapper
+import io.github.whitenoise0000.shukutenalarm.weather.jma.TelopsRepository
 
 /**
  * 天気取得の上位調停リポジトリ（JMA仕様）。
@@ -18,9 +19,12 @@ class WeatherRepository(
     private val context: Context,
     private val forecastApi: JmaForecastApi,
     private val gsiApi: GsiApi,
-    private val areaRepository: AreaRepository
+    private val areaRepository: AreaRepository,
+    private val telopsRepository: TelopsRepository
 ) {
-    private val forecastRepo by lazy { ForecastRepository(context, forecastApi) }
+    private val forecastRepo by lazy {
+        ForecastRepository(context, forecastApi, telopsRepository)
+    }
     private val mapper by lazy { JmaMapper(areaRepository) }
 
     /**
