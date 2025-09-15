@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -434,15 +435,36 @@ fun EditAlarmScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
                 // デフォルトサウンド（カード表示）
+                // 仕様変更: 行タップで編集呼出し。右端アイコンは「削除→プレビュー」の順。
                 ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    val current = holidaySound.value
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable {
+                                // 行タップで着信音ピッカーを起動（編集）
+                                onPicked.value = { picked -> holidaySound.value = picked }
+                                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                    putExtra(
+                                        RingtoneManager.EXTRA_RINGTONE_TYPE,
+                                        RingtoneManager.TYPE_ALARM
+                                    )
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                    putExtra(
+                                        RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                        current
+                                            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                    )
+                                }
+                                picker.launch(intent)
+                            }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        // アイコンとラベル部
                         Icon(
                             Icons.Outlined.MusicNote,
                             contentDescription = null,
@@ -453,7 +475,6 @@ fun EditAlarmScreen(
                                 text = stringResource(R.string.label_default_sound),
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            val current = holidaySound.value
                             val sub = current?.let { ringtoneTitle(ctx, it) }
                                 ?: stringResource(R.string.text_device_default)
                             Text(
@@ -462,38 +483,39 @@ fun EditAlarmScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        val current = holidaySound.value
-                        IconButton(onClick = {
-                            onPicked.value = { picked -> holidaySound.value = picked }
-                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                                putExtra(
-                                    RingtoneManager.EXTRA_RINGTONE_TYPE,
-                                    RingtoneManager.TYPE_ALARM
-                                )
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                                putExtra(
-                                    RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                    current
-                                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                                )
-                            }
-                            picker.launch(intent)
-                        }) {
-                            Icon(
-                                Icons.Outlined.Edit,
-                                contentDescription = stringResource(R.string.action_edit)
-                            )
-                        }
+                        // 右端アクション: 削除（選択時のみ）→ プレビュー（常時）
                         if (current != null) {
-                            IconButton(onClick = {
-                                holidaySound.value = null
-                            }) {
+                            IconButton(onClick = { holidaySound.value = null }) {
                                 Icon(
                                     Icons.Outlined.Close,
-                                    contentDescription = stringResource(R.string.text_cancel)
+                                    contentDescription = stringResource(R.string.action_delete)
                                 )
                             }
+                        }
+                        IconButton(onClick = {
+                            // プレビューは選択済み→端末デフォルトの順で解決
+                            val chosen = current ?: (RingtoneManager.getDefaultUri(
+                                RingtoneManager.TYPE_ALARM
+                            ) ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                            val intent = Intent(ctx, RingingActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                putExtra("id", -999)
+                                putExtra("soundUri", chosen?.toString() ?: "")
+                                putExtra("weatherLabel", ctx.getString(R.string.label_default_sound))
+                                putExtra("isHoliday", false)
+                                putExtra("holidayName", "")
+                                putExtra("alarmName", nameState.value)
+                                putExtra("volumeMode", volumeModeState.value.name)
+                                putExtra("volumePercent", volumePercentState.floatValue.toInt())
+                                putExtra("vibrate", vibrateState.value)
+                                putExtra("respectSilent", respectSilentState.value)
+                            }
+                            ContextCompat.startActivities(ctx, arrayOf(intent))
+                        }) {
+                            Icon(
+                                Icons.Outlined.PlayArrow,
+                                contentDescription = stringResource(R.string.action_preview)
+                            )
                         }
                     }
                 }
@@ -509,9 +531,33 @@ fun EditAlarmScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     weatherCats.forEach { cat ->
                         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                            // 仕様変更: 行タップで編集呼出し。右端アイコンは「削除→プレビュー」。
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clickable {
+                                        val current = soundMap[cat]
+                                        onPicked.value = { picked -> soundMap[cat] = picked }
+                                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                            putExtra(
+                                                RingtoneManager.EXTRA_RINGTONE_TYPE,
+                                                RingtoneManager.TYPE_ALARM
+                                            )
+                                            putExtra(
+                                                RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT,
+                                                false
+                                            )
+                                            putExtra(
+                                                RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,
+                                                true
+                                            )
+                                            putExtra(
+                                                RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                                current
+                                            )
+                                        }
+                                        picker.launch(intent)
+                                    }
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -544,58 +590,34 @@ fun EditAlarmScreen(
                                 }
                                 val current = soundMap[cat]
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    IconButton(onClick = {
-                                        onPicked.value = { picked -> soundMap[cat] = picked }
-                                        val intent =
-                                            Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                                                putExtra(
-                                                    RingtoneManager.EXTRA_RINGTONE_TYPE,
-                                                    RingtoneManager.TYPE_ALARM
-                                                )
-                                                putExtra(
-                                                    RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT,
-                                                    false
-                                                )
-                                                putExtra(
-                                                    RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,
-                                                    true
-                                                )
-                                                putExtra(
-                                                    RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                                    current
-                                                )
-                                            }
-                                        picker.launch(intent)
-                                    }) {
-                                        Icon(
-                                            Icons.Outlined.Edit,
-                                            contentDescription = stringResource(R.string.action_edit)
-                                        )
+                                    // 削除（選択済み時のみ表示）
+                                    if (current != null) {
+                                        IconButton(onClick = { soundMap[cat] = null }) {
+                                            Icon(
+                                                Icons.Outlined.Close,
+                                                contentDescription = stringResource(R.string.action_delete)
+                                            )
+                                        }
                                     }
+                                    // プレビュー（常時表示）
                                     IconButton(onClick = {
                                         val uri: Uri? = current ?: holidaySound.value
                                         val chosen = uri ?: (RingtoneManager.getDefaultUri(
                                             RingtoneManager.TYPE_ALARM
-                                        )
-                                            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
-                                        val intent =
-                                            Intent(ctx, RingingActivity::class.java).apply {
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                                putExtra("id", -999)
-                                                putExtra("soundUri", chosen.toString())
-                                                putExtra("weatherLabel", weatherLabel)
-                                                putExtra("isHoliday", false)
-                                                putExtra("holidayName", "")
-                                                putExtra("holidayName", "")
-                                                putExtra("alarmName", nameState.value)
-                                                putExtra("volumeMode", volumeModeState.value.name)
-                                                putExtra(
-                                                    "volumePercent",
-                                                    volumePercentState.floatValue.toInt()
-                                                )
-                                                putExtra("vibrate", vibrateState.value)
-                                                putExtra("respectSilent", respectSilentState.value)
-                                            }
+                                        ) ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                                        val intent = Intent(ctx, RingingActivity::class.java).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                            putExtra("id", -999)
+                                            putExtra("soundUri", chosen?.toString() ?: "")
+                                            putExtra("weatherLabel", weatherLabel)
+                                            putExtra("isHoliday", false)
+                                            putExtra("holidayName", "")
+                                            putExtra("alarmName", nameState.value)
+                                            putExtra("volumeMode", volumeModeState.value.name)
+                                            putExtra("volumePercent", volumePercentState.floatValue.toInt())
+                                            putExtra("vibrate", vibrateState.value)
+                                            putExtra("respectSilent", respectSilentState.value)
+                                        }
                                         ContextCompat.startActivities(ctx, arrayOf(intent))
                                     }) {
                                         Icon(
@@ -603,17 +625,7 @@ fun EditAlarmScreen(
                                             contentDescription = stringResource(R.string.action_preview)
                                         )
                                     }
-                                    if (current != null) {
-                                        IconButton(onClick = {
-                                            soundMap[cat] = null
-                                        }) {
-                                            Icon(
-                                                Icons.Outlined.Close,
-                                                contentDescription = stringResource(R.string.text_cancel)
-                                            )
-                                        }
-                                    }
-                                 }
+                                }
                             }
                         }
                     }
