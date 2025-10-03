@@ -59,6 +59,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.compose.material3.Icon
@@ -184,6 +185,8 @@ private fun RingingScreen(
                         .build(), false
                 )
                 setMediaItem(MediaItem.fromUri(soundUri))
+                // ExoPlayerでは明示的にループ設定を行い、アラーム音が止まらないようにする
+                repeatMode = Player.REPEAT_MODE_ONE
                 prepare()
                 playWhenReady = true
             }
