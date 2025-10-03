@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
+import io.github.whitenoise0000.shukutenalarm.data.model.RepeatType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.time.LocalTime
 
 class DataStoreAlarmRepository(private val context: Context) {
     private fun keyOf(id: Int) = stringPreferencesKey(PreferencesKeys.KEY_ALARM_PREFIX + id + PreferencesKeys.KEY_ALARM_SUFFIX)
@@ -45,11 +47,13 @@ class DataStoreAlarmRepository(private val context: Context) {
 
     /**
      * アラームを複製する。新しいIDを割り当て、名前を変更して保存する。
+     * クイックタイマーは複製不可。
      * @param originalId 複製元のアラームID
      * @return 新しいアラームのID、複製に失敗した場合はnull
      */
     suspend fun duplicate(originalId: Int): Int? {
         val original = load(originalId) ?: return null
+        if (original.isQuickTimer) return null // クイックタイマーは複製不可
         val existingIds = list().map { it.id }
         val newId = (existingIds.maxOrNull() ?: 0) + 1
         val duplicated = original.copy(
@@ -58,6 +62,37 @@ class DataStoreAlarmRepository(private val context: Context) {
             enabled = false // 複製時はデフォルトで無効
         )
         save(duplicated)
+        return newId
+    }
+
+    /**
+     * クイックタイマーを作成する。既存がある場合は上書き。
+     * @param time タイマーの時間
+     * @return 新しいアラームのID、作成に失敗した場合はnull
+     */
+    suspend fun createQuickTimer(time: LocalTime): Int? {
+        // 既存のクイックタイマーを削除
+        val existing = list().find { it.isQuickTimer }
+        if (existing != null) {
+            delete(existing.id)
+        }
+
+        val existingIds = list().map { it.id }
+        val newId = (existingIds.maxOrNull() ?: 0) + 1
+
+        val quickTimer = AlarmSpec(
+            id = newId,
+            name = "クイックタイマー",
+            time = time,
+            daysOfWeek = setOf(), // 1回のみなので曜日不要
+            holidayPolicy = io.github.whitenoise0000.shukutenalarm.data.model.HolidayPolicy.SAME,
+            repeatType = RepeatType.ONE_SHOT,
+            isQuickTimer = true,
+            enabled = true, // 作成時は有効
+            soundMapping = emptyMap() // デフォルトサウンドを使用
+        )
+
+        save(quickTimer)
         return newId
     }
 }

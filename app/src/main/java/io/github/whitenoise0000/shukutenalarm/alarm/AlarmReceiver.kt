@@ -137,8 +137,13 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
 
 
-                // 次回をスケジュール（ONE_SHOT は鳴動後に自動無効化するため再登録しない）
-                if (spec.repeatType == RepeatType.ONE_SHOT) {
+                // 次回をスケジュール（ONE_SHOT は鳴動後に自動無効化、クイックタイマーは削除）
+                if (spec.isQuickTimer) {
+                    // クイックタイマー: 鳴動後は削除
+                    withContext(Dispatchers.IO) {
+                        repo.delete(spec.id)
+                    }
+                } else if (spec.repeatType == RepeatType.ONE_SHOT) {
                     // 1回のみ: 鳴動後は無効化して保存（一覧に残し、再起動時も再登録されない）
                     withContext(Dispatchers.IO) {
                         repo.save(spec.copy(enabled = false))

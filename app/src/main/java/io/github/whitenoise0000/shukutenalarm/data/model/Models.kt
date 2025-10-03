@@ -61,7 +61,9 @@ data class AlarmSpec(
      * - WEEKLY: 週ごと（従来どおり曜日ベースで繰り返し）
      * - ONE_SHOT: 1回のみ（曜日に従い最短の1回だけ鳴動し、自動で無効化）
      */
-    val repeatType: RepeatType = RepeatType.WEEKLY
+    val repeatType: RepeatType = RepeatType.WEEKLY,
+    /** クイックタイマーかどうか */
+    val isQuickTimer: Boolean = false
 )
 
 /**

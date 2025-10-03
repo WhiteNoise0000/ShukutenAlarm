@@ -108,6 +108,12 @@ private fun AppRoot() {
                 },
                 actions = {
                     if (route == "home") {
+                        IconButton(onClick = { navController.navigate("edit") }) {
+                            Icon(
+                                Icons.Outlined.Add,
+                                contentDescription = stringResource(R.string.label_add)
+                            )
+                        }
                         IconButton(onClick = { navController.navigate("settings") }) {
                             Icon(
                                 Icons.Outlined.Settings,
@@ -133,14 +139,7 @@ private fun AppRoot() {
             )
         },
         floatingActionButton = {
-            if (route == "home") {
-                FloatingActionButton(onClick = { navController.navigate("edit") }) {
-                    Icon(
-                        Icons.Outlined.Add,
-                        contentDescription = stringResource(R.string.label_add)
-                    )
-                }
-            }
+            // FABはAlarmListScreenで管理
         }
     ) { innerPadding ->
         Surface(

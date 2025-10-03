@@ -1,10 +1,11 @@
 <resources>
-    <string name="app_name">祝天アラーム</string>
+    <string name="app_name">天気アラーム</string>
 
     <!-- タイトル/ラベル -->
     <string name="title_alarm_list">アラーム一覧</string>
     <string name="title_add_alarm">アラーム追加</string>
     <string name="title_settings">設定</string>
+    <string name="quick_timer_title">クイックタイマー</string>
 
     <string name="label_settings">設定</string>
     <string name="label_alarm_name">アラーム名</string>
@@ -32,6 +33,8 @@
     <string name="action_delete">削除</string>
     <string name="action_edit">編集</string>
     <string name="action_duplicate">コピー</string>
+    <string name="action_create">作成</string>
+    <string name="action_add_quick_timer">クイックタイマーを追加</string>
     <string name="action_pick_time">時刻を選択</string>
     <string name="action_preview">プレビュー</string>
     <string name="action_stop">停止</string>
@@ -115,6 +118,10 @@
     <string name="toast_alarm_duplicated">アラームをコピーしました</string>
     <string name="toast_settings_saved">設定を保存しました</string>
     <string name="toast_city_selected">都市を選択しました</string>
+    <string name="toast_quick_timer_created">クイックタイマーを作成しました</string>
+    <string name="quick_timer_confirm_title">クイックタイマーの上書き</string>
+    <string name="quick_timer_confirm_message">既にクイックタイマーが設定されています。上書きしますか？</string>
+    <string name="action_confirm">確認</string>
 
     <!-- スキップ状態表示（一覧） -->
     <string name="label_skip_until_format">スキップ中: %1$s</string>
