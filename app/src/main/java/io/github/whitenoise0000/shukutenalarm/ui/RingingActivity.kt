@@ -117,7 +117,10 @@ class RingingActivity : ComponentActivity() {
                     volumePercent = intent.getIntExtra("volumePercent", 100).coerceIn(0, 100),
                     vibrate = intent.getBooleanExtra("vibrate", false),
                     respectSilent = intent.getBooleanExtra("respectSilent", true),
-                    onFinished = { finish() }
+                    onFinished = {
+                        // 履歴画面からの誤再開を防ぐため、タスクごと終了して履歴から除外する
+                        finishAndRemoveTask()
+                    }
                 )
             }
         }

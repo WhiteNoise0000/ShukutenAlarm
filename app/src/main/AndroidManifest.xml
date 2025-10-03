@@ -48,7 +48,8 @@
             android:name=".ui.RingingActivity"
             android:exported="false"
             android:showOnLockScreen="true"
-            android:turnScreenOn="true" />
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true" />
 
         
 
