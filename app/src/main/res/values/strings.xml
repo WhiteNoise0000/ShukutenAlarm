@@ -145,8 +145,15 @@
     <string name="toast_master_refreshed">マスタデータを更新しました</string>
     <!-- 表示: 一覧の1回のみラベル -->
     <string name="label_one_shot_suffix">（1回）</string>
+
+    <!-- データ移行 -->
+    <string name="title_backup_restore">データのバックアップと復元</string>
+    <string name="action_export">設定を書き出す (エクスポート)</string>
+    <string name="desc_export">現在の設定をファイルに保存します。</string>
+    <string name="action_import">設定を読み込む (インポート)</string>
+    <string name="desc_import">ファイルから設定を復元します。現在の設定は上書きされます。</string>
+    <string name="toast_export_success">設定をエクスポートしました</string>
+    <string name="toast_export_failed">エクスポートに失敗しました</string>
+    <string name="toast_import_success">設定をインポートしました</string>
+    <string name="toast_import_failed">インポートに失敗しました</string>
 </resources>
-
-
-
-

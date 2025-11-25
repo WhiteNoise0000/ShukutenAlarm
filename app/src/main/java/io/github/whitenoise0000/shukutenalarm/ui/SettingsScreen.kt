@@ -9,6 +9,7 @@ import android.location.LocationManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.SaveAlt
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
@@ -56,7 +60,9 @@ import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import io.github.whitenoise0000.shukutenalarm.R
+import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
+import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
 import io.github.whitenoise0000.shukutenalarm.holiday.HolidayRepository
 import io.github.whitenoise0000.shukutenalarm.network.EtagCacheInterceptor
 import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
@@ -74,6 +80,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -89,6 +97,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { SettingsRepository(context) }
+    val alarmRepo = remember { DataStoreAlarmRepository(context) }
     // 都市名検索は area.json ローカル検索へ切替えるためGeocoding依存は廃止
 
     val lat = remember { mutableStateOf("35.0") }
@@ -115,6 +124,59 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val fetchingWeather = remember { mutableStateOf(false) }
     val weatherTestMessage = remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    // ファイル書き出し（エクスポート）用のランチャー
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+        onResult = { uri ->
+            uri?.let {
+                scope.launch {
+                    try {
+                        val alarms = alarmRepo.list()
+                        val jsonString = Json.encodeToString(alarms)
+                        withContext(Dispatchers.IO) {
+                            context.contentResolver.openOutputStream(it)?.use { stream ->
+                                stream.write(jsonString.toByteArray())
+                            }
+                        }
+                        Toast.makeText(context, R.string.toast_export_success, Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(context, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    )
+
+    // ファイル読み込み（インポート）用のランチャー
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            uri?.let {
+                scope.launch {
+                    try {
+                        val jsonString = withContext(Dispatchers.IO) {
+                            context.contentResolver.openInputStream(it)?.use { stream ->
+                                stream.bufferedReader().readText()
+                            }
+                        }
+                        if (jsonString != null) {
+                            val alarms = Json.decodeFromString<List<AlarmSpec>>(jsonString)
+                            // 既存の全アラームを削除
+                            alarmRepo.list().forEach { oldAlarm -> alarmRepo.delete(oldAlarm.id) }
+                            // インポートしたアラームを保存
+                            alarms.forEach { newAlarm -> alarmRepo.save(newAlarm) }
+                            // 設定が変更されたことを通知し、アラームを再スケジュール
+                            onSaved()
+                            Toast.makeText(context, R.string.toast_import_success, Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, R.string.toast_import_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    )
 
     LaunchedEffect(Unit) {
         val s = withContext(Dispatchers.IO) { repo.settingsFlow.first() }
@@ -461,7 +523,7 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                                         .addConverterFactory(json.asConverterFactory(contentType))
                                         .build()
                                     val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
-                                                                        val gsiApi = gsiRetrofit.create(GsiApi::class.java)
+                                                                         val gsiApi = gsiRetrofit.create(GsiApi::class.java)
                                     val constApi = jmaRetrofit.create(JmaConstApi::class.java)
                                     val areaRepo = AreaRepository(context, constApi)
                                     val telopsRepo = TelopsRepository(context)
@@ -734,6 +796,62 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
             }
         }
 
+        // データのバックアップと復元
+        OutlinedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                RowAlignCenter {
+                    Icon(
+                        Icons.Outlined.SaveAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = stringResource(R.string.title_backup_restore),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                HorizontalDivider()
+                // Export
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { exportLauncher.launch("shukuten_alarm_backup.json") }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(Icons.Outlined.FileUpload, contentDescription = null)
+                    Column {
+                        Text(stringResource(R.string.action_export))
+                        Text(
+                            stringResource(R.string.desc_export),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                // Import
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { importLauncher.launch("application/json") }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(Icons.Outlined.FileDownload, contentDescription = null)
+                    Column {
+                        Text(stringResource(R.string.action_import))
+                        Text(
+                            stringResource(R.string.desc_import),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
