@@ -446,9 +446,10 @@ fun EditAlarmScreen(
                                 // 行タップで着信音ピッカーを起動（編集）
                                 onPicked.value = { picked -> holidaySound.value = picked }
                                 val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                    // 端末内蔵アラーム音と通知サウンドを同時に候補へ並べるため ALARM/RINGTONE の両方を指定
                                     putExtra(
                                         RingtoneManager.EXTRA_RINGTONE_TYPE,
-                                        RingtoneManager.TYPE_ALARM
+                                        RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE
                                     )
                                     putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
                                     putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
@@ -456,6 +457,7 @@ fun EditAlarmScreen(
                                         RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
                                         current
                                             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
                                     )
                                 }
                                 picker.launch(intent)
@@ -494,9 +496,11 @@ fun EditAlarmScreen(
                         }
                         IconButton(onClick = {
                             // プレビューは選択済み→端末デフォルトの順で解決
-                            val chosen = current ?: (RingtoneManager.getDefaultUri(
-                                RingtoneManager.TYPE_ALARM
-                            ) ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                            val chosen = current ?: (
+                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                            )
                             val intent = Intent(ctx, RingingActivity::class.java).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                 putExtra("id", -999)
@@ -539,9 +543,10 @@ fun EditAlarmScreen(
                                         val current = soundMap[cat]
                                         onPicked.value = { picked -> soundMap[cat] = picked }
                                         val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                            // アラーム用プリセットを逃さないよう ALARM/RINGTONE の両方を許可する
                                             putExtra(
                                                 RingtoneManager.EXTRA_RINGTONE_TYPE,
-                                                RingtoneManager.TYPE_ALARM
+                                                RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE
                                             )
                                             putExtra(
                                                 RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT,
@@ -602,9 +607,11 @@ fun EditAlarmScreen(
                                     // プレビュー（常時表示）
                                     IconButton(onClick = {
                                         val uri: Uri? = current ?: holidaySound.value
-                                        val chosen = uri ?: (RingtoneManager.getDefaultUri(
-                                            RingtoneManager.TYPE_ALARM
-                                        ) ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                                        val chosen = uri ?: (
+                                            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                                                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                                        )
                                         val intent = Intent(ctx, RingingActivity::class.java).apply {
                                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                             putExtra("id", -999)
