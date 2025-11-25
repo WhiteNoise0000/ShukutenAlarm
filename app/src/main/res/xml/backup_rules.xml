@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- DataStore (`datastore` ドメイン) をバックアップ対象に含める -->
-    <include domain="datastore" path="."/>
-    <!-- SharedPreferences (`sharedpref` ドメイン) は除外する -->
+    <!-- DataStoreが使用するファイルをバックアップ対象に含める -->
+    <include domain="file" path="datastore/"/>
+    <!-- SharedPreferencesはバックアップ対象から除外する -->
     <exclude domain="sharedpref" path="."/>
 </full-backup-content>
