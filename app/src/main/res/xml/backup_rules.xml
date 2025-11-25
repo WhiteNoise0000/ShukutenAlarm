@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- DataStoreが使用するファイルをバックアップ対象に含める -->
+    <!-- DataStoreが使用するファイルのみバックアップ対象に含める -->
     <include domain="file" path="datastore/"/>
-    <!-- SharedPreferencesはバックアップ対象から除外する -->
-    <exclude domain="sharedpref" path="."/>
 </full-backup-content>

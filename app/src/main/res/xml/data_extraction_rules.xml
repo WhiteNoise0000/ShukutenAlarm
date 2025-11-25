@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- DataStore (`datastore` ドメイン) をバックアップ対象に含める -->
-        <include domain="datastore" />
-        <!-- SharedPreferences (`sharedpref` ドメイン) は除外する -->
-        <exclude domain="sharedpref"/>
+        <!-- DataStoreが使用するファイルのみバックアップ対象に含める -->
+        <include domain="file" path="datastore/"/>
     </cloud-backup>
 </data-extraction-rules>
