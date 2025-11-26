@@ -47,14 +47,19 @@ class BackupRepository {
 
         for (alarm in alarms) {
             // デフォルトサウンド（空またはnull）はチェック対象外
-            if (alarm.defaultSoundUri.isNotBlank() && !isValidSoundUri(context, alarm.defaultSoundUri)) {
-                missingSounds.add(alarm.defaultSoundUri)
+            val holidaySound = alarm.holidaySound
+            if (holidaySound != null) {
+                val uriString = holidaySound.toString()
+                if (uriString.isNotBlank() && !isValidSoundUri(context, uriString)) {
+                    missingSounds.add(uriString)
+                }
             }
 
             // 天気別サウンドをチェック
             for ((_, uri) in alarm.soundMapping) {
-                if (uri.isNotBlank() && !isValidSoundUri(context, uri)) {
-                    missingSounds.add(uri)
+                val uriString = uri.toString()
+                if (uriString.isNotBlank() && !isValidSoundUri(context, uriString)) {
+                    missingSounds.add(uriString)
                 }
             }
         }
@@ -75,14 +80,18 @@ class BackupRepository {
             var newAlarm = alarm
 
             // デフォルトサウンドの置換
-            val newDefaultUri = replacementMap[alarm.defaultSoundUri]
-            if (newDefaultUri != null) {
-                newAlarm = newAlarm.copy(defaultSoundUri = newDefaultUri)
+            val holidaySound = alarm.holidaySound
+            if (holidaySound != null) {
+                val newDefaultUriString = replacementMap[holidaySound.toString()]
+                if (newDefaultUriString != null) {
+                    newAlarm = newAlarm.copy(holidaySound = Uri.parse(newDefaultUriString))
+                }
             }
 
             // 天気別サウンドの置換
             val newSoundMapping = newAlarm.soundMapping.mapValues { (_, uri) ->
-                replacementMap[uri] ?: uri
+                val newUriString = replacementMap[uri.toString()]
+                if (newUriString != null) Uri.parse(newUriString) else uri
             }
 
             if (newSoundMapping != newAlarm.soundMapping) {
