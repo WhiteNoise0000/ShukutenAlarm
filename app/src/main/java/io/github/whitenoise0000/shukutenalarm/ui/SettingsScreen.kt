@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.media.RingtoneManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,11 +27,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.SaveAlt
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -44,6 +47,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
@@ -60,6 +64,7 @@ import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import io.github.whitenoise0000.shukutenalarm.R
+import io.github.whitenoise0000.shukutenalarm.data.BackupRepository
 import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
@@ -75,6 +80,7 @@ import io.github.whitenoise0000.shukutenalarm.weather.jma.JmaForecastApi
 import io.github.whitenoise0000.shukutenalarm.weather.jma.TelopsRepository
 import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import io.github.whitenoise0000.shukutenalarm.work.MasterRefreshScheduler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -98,6 +104,7 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { SettingsRepository(context) }
     val alarmRepo = remember { DataStoreAlarmRepository(context) }
+    val backupRepo = remember { BackupRepository() } // BackupRepositoryのインスタンス化
     // 都市名検索は area.json ローカル検索へ切替えるためGeocoding依存は廃止
 
     val lat = remember { mutableStateOf("35.0") }
@@ -124,6 +131,33 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val fetchingWeather = remember { mutableStateOf(false) }
     val weatherTestMessage = remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    // サウンド再選択フローの状態
+    val missingSounds = remember { mutableStateListOf<String>() } // 無効なURIのリスト
+    val soundReplacementMap = remember { mutableMapOf<String, String>() } // 置換マップ (旧URI -> 新URI)
+    val alarmsToImport = remember { mutableStateOf<List<AlarmSpec>?>(null) } // インポート待ちのアラームリスト
+
+    // サウンドピッカー用のランチャー
+    val soundPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            val newUri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            val oldUri = missingSounds.firstOrNull() // 現在処理中の無効なURI
+
+            if (oldUri != null && newUri != null) {
+                // 選択された新しいURIを、現在処理中の無効なURIの置換値としてマップに登録
+                soundReplacementMap[oldUri] = newUri.toString()
+            } else if (oldUri != null) {
+                // ユーザーがキャンセルした場合、デフォルトサウンド（空文字列）で置換
+                soundReplacementMap[oldUri] = ""
+            }
+
+            // 処理済みのURIをリストから削除し、次の無効なURIの処理へ進む
+            if (oldUri != null) {
+                missingSounds.removeAt(0)
+            }
+        }
+    )
 
     // ファイル書き出し（エクスポート）用のランチャー
     val exportLauncher = rememberLauncherForActivityResult(
@@ -162,13 +196,18 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                         }
                         if (jsonString != null) {
                             val alarms = Json.decodeFromString<List<AlarmSpec>>(jsonString)
-                            // 既存の全アラームを削除
-                            alarmRepo.list().forEach { oldAlarm -> alarmRepo.delete(oldAlarm.id) }
-                            // インポートしたアラームを保存
-                            alarms.forEach { newAlarm -> alarmRepo.save(newAlarm) }
-                            // 設定が変更されたことを通知し、アラームを再スケジュール
-                            onSaved()
-                            Toast.makeText(context, R.string.toast_import_success, Toast.LENGTH_SHORT).show()
+                            val missing = backupRepo.findMissingSounds(context, alarms)
+
+                            if (missing.isNotEmpty()) {
+                                // 無効なサウンドがある場合、再選択フローを開始
+                                alarmsToImport.value = alarms
+                                missingSounds.clear()
+                                missingSounds.addAll(missing)
+                                soundReplacementMap.clear()
+                            } else {
+                                // 無効なサウンドがない場合、即座にインポート
+                                performImport(context, alarmRepo, alarms, onSaved)
+                            }
                         }
                     } catch (e: Exception) {
                         Toast.makeText(context, R.string.toast_import_failed, Toast.LENGTH_SHORT).show()
@@ -177,6 +216,26 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
             }
         }
     )
+
+    // 再選択フローの実行
+    LaunchedEffect(missingSounds.firstOrNull()) {
+        val oldUri = missingSounds.firstOrNull()
+        if (oldUri != null) {
+            // サウンドピッカーを起動
+            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, context.getString(R.string.label_replace_sound_title, oldUri))
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+            }
+            soundPickerLauncher.launch(intent)
+        } else if (alarmsToImport.value != null && soundReplacementMap.isNotEmpty()) {
+            // すべての無効なサウンドの代替が選択されたら、インポートを完了
+            val finalAlarms = backupRepo.replaceSounds(alarmsToImport.value!!, soundReplacementMap)
+            performImport(context, alarmRepo, finalAlarms, onSaved)
+            alarmsToImport.value = null
+        }
+    }
 
     LaunchedEffect(Unit) {
         val s = withContext(Dispatchers.IO) { repo.settingsFlow.first() }
@@ -852,6 +911,64 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                 }
             }
         }
+    }
+
+    // サウンド再選択ダイアログ（実際はLaunchedEffectでピッカーを起動するため、ここでは不要）
+    // LaunchedEffectでピッカーを起動しているため、ダイアログは不要。
+
+    // インポート処理の共通関数
+    if (missingSounds.isNotEmpty()) {
+        val currentMissingUri = missingSounds.first()
+        val ringtone = remember(currentMissingUri) {
+            try {
+                RingtoneManager.getRingtone(context, Uri.parse(currentMissingUri))
+            } catch (e: Exception) {
+                null
+            }
+        }
+        val soundName = ringtone?.getTitle(context) ?: currentMissingUri
+        
+        AlertDialog(
+            onDismissRequest = { /* 外部タップでのキャンセルは不可 */ },
+            title = { Text(stringResource(R.string.title_missing_sound)) },
+            text = { Text(stringResource(R.string.message_missing_sound, soundName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    // LaunchedEffectが自動でピッカーを起動するため、ここでは何もしない
+                }) {
+                    Text(stringResource(R.string.action_select_new_sound))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    // キャンセルされた場合、デフォルトサウンド（空文字列）で置換
+                    soundReplacementMap[currentMissingUri] = ""
+                    missingSounds.removeAt(0)
+                }) {
+                    Text(stringResource(R.string.text_cancel))
+                }
+            }
+        )
+    }
+}
+
+private fun performImport(
+    context: Context,
+    alarmRepo: DataStoreAlarmRepository,
+    alarms: List<AlarmSpec>,
+    onSaved: () -> Unit
+) {
+    val scope = CoroutineScope(Dispatchers.Main)
+    scope.launch {
+        withContext(Dispatchers.IO) {
+            // 既存の全アラームを削除
+            alarmRepo.list().forEach { oldAlarm -> alarmRepo.delete(oldAlarm.id) }
+            // インポートしたアラームを保存
+            alarms.forEach { newAlarm -> alarmRepo.save(newAlarm) }
+        }
+        // 設定が変更されたことを通知し、アラームを再スケジュール
+        onSaved()
+        Toast.makeText(context, R.string.toast_import_success, Toast.LENGTH_SHORT).show()
     }
 }
 

@@ -156,4 +156,10 @@
     <string name="toast_export_failed">エクスポートに失敗しました</string>
     <string name="toast_import_success">設定をインポートしました</string>
     <string name="toast_import_failed">インポートに失敗しました</string>
+
+    <!-- サウンド再選択フロー -->
+    <string name="title_missing_sound">アラーム音が見つかりません</string>
+    <string name="message_missing_sound">インポートされたアラーム設定で使用されているサウンド「%1$s」が、この端末で見つかりませんでした。代替のサウンドを選択してください。この選択は、このサウンドを使用しているすべてのアラームに適用されます。</string>
+    <string name="action_select_new_sound">新しいサウンドを選択</string>
+    <string name="label_replace_sound_title">代替サウンドの選択: %1$s</string>
 </resources>
