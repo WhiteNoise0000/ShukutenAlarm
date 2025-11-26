@@ -19,7 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
+
 import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
@@ -370,7 +370,8 @@ private fun AlarmCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.elevatedCardColors()
+        colors = CardDefaults.elevatedCardColors(),
+        onClick = { if (!spec.isQuickTimer) onEdit() }
     ) {
         Column(
             Modifier
@@ -406,12 +407,6 @@ private fun AlarmCard(
                     Icon(
                         Icons.Outlined.ContentCopy,
                         contentDescription = stringResource(R.string.action_duplicate)
-                    )
-                }
-                IconButton(onClick = onEdit, enabled = !spec.isQuickTimer) {
-                    Icon(
-                        Icons.Outlined.Edit,
-                        contentDescription = stringResource(R.string.action_edit)
                     )
                 }
                 IconButton(onClick = onDelete) {
