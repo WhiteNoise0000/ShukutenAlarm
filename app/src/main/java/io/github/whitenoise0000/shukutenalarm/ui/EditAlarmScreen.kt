@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.RingtoneManager
 import android.net.Uri
 import android.widget.Toast
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -132,6 +133,17 @@ fun EditAlarmScreen(
                 RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
                 Uri::class.java
             )
+            // 永続的な読み取り権限の取得を試みる（外部ファイル選択時の再生エラー防止）
+            if (uri != null) {
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: Exception) {
+                    // システム着信音など、権限取得が不要/不可な場合は無視
+                }
+            }
             onPicked.value(uri)
         }
     val days = remember {
@@ -781,9 +793,33 @@ private fun DayOfWeekChips(days: MutableList<Pair<DayOfWeek, Boolean>>) {
  * Ringtone のタイトルを取得するユーティリティ。
  * - タイトル取得に失敗した場合は「不明」を返す。
  */
-private fun ringtoneTitle(context: android.content.Context, uri: Uri): String =
-    runCatching { RingtoneManager.getRingtone(context, uri)?.getTitle(context) }
-        .getOrNull() ?: context.getString(R.string.text_unknown)
+private fun ringtoneTitle(context: android.content.Context, uri: Uri): String {
+    // 1. まずは標準の RingtoneManager でタイトル取得を試みる
+    val rmTitle = runCatching { RingtoneManager.getRingtone(context, uri)?.getTitle(context) }.getOrNull()
+
+    // タイトルが有効かつ、数字だけの羅列（IDなど）でないならそれを採用
+    if (!rmTitle.isNullOrBlank() && !rmTitle.all { it.isDigit() }) {
+        return rmTitle
+    }
+
+    // 2. 数字だけの場合や取得失敗時は、ContentResolver から表示名（ファイル名）を取得
+    if (uri.scheme == android.content.ContentResolver.SCHEME_CONTENT) {
+        runCatching {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        val name = cursor.getString(nameIndex)
+                        if (!name.isNullOrBlank()) return name
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. それでもダメなら RingtoneManager の結果（数字でも）か、不明とする
+    return rmTitle ?: context.getString(R.string.text_unknown)
+}
 
 @Composable
 private fun RowAlignCenter(content: @Composable RowScope.() -> Unit) {

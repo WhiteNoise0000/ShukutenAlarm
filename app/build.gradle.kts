@@ -41,6 +41,10 @@ android {
         // Jetpack Compose を有効化
         compose = true
     }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
