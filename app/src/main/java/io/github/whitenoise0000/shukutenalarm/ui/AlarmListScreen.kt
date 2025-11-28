@@ -216,6 +216,12 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
                             },
                             onToggle = { enable ->
                                 val updated = spec.copy(enabled = enable)
+                                // UIの状態を即座に更新して見た目（カード色など）を反映させる
+                                val index = list.indexOfFirst { it.id == spec.id }
+                                if (index != -1) {
+                                    list[index] = updated
+                                }
+
                                 scope.launch {
                                     withContext(Dispatchers.IO) { repo.save(updated) }
                                     if (enable) scheduler.scheduleNext(updated) else scheduler.cancel(
@@ -366,11 +372,28 @@ private fun AlarmCard(
             skipUntilLabel.value = null
         }
     }
+    // 無効時のカードスタイル調整
+    val cardColors = if (spec.enabled) {
+        CardDefaults.elevatedCardColors()
+    } else {
+        // 無効時は背景を少しグレー（SurfaceVariant）にし、コンテンツ色も薄くする
+        CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    }
+    val cardElevation = if (spec.enabled) {
+        CardDefaults.elevatedCardElevation()
+    } else {
+        // 無効時はフラットにする
+        CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+    }
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.elevatedCardColors(),
+        colors = cardColors,
+        elevation = cardElevation,
         onClick = { if (!spec.isQuickTimer) onEdit() }
     ) {
         Column(
@@ -379,12 +402,18 @@ private fun AlarmCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // 無効時の表示色調整
+            val disabledAlpha = 0.3f
+            val primaryColor = if (spec.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
+            val onSurfaceVariantColor = if (spec.enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
+            val mainTextColor = if (spec.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
+
             // アラーム名は設定がある場合のみ、1行目に独立表示して見切れを防ぐ
             if (spec.name.isNotBlank()) {
                 Text(
                     text = spec.name,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = onSurfaceVariantColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -394,12 +423,13 @@ private fun AlarmCard(
                 Icon(
                     Icons.Outlined.Alarm,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = primaryColor
                 )
                 
                 Text(
                     text = spec.time.formatHHMM(),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = mainTextColor,
                     // 時刻はカードの主役とし、右側の操作アイコン群とのレイアウト競合を避けるため可変幅にする
                     modifier = Modifier.weight(1f)
                 )
@@ -439,12 +469,12 @@ private fun AlarmCard(
                         text = stringResource(R.string.label_days) + ": " + daysLabel,
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onSurfaceVariantColor
                     )
                     Text(
                         text = policyLabel,
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        color = primaryColor
                     )
                 }
             }
@@ -455,7 +485,7 @@ private fun AlarmCard(
                     Icon(
                         Icons.Outlined.Snooze,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
+                        tint = if (spec.enabled) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
                     )
                     Text(
                         text = stringResource(
@@ -464,7 +494,7 @@ private fun AlarmCard(
                         ),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = onSurfaceVariantColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -511,7 +541,7 @@ private fun AlarmCard(
                 } else {
                     disabled
                 }
-                Text(label, modifier = Modifier.weight(1f))
+                Text(label, modifier = Modifier.weight(1f), color = mainTextColor)
                 Switch(
                     checked = checked.value,
                     onCheckedChange = { enabled ->
