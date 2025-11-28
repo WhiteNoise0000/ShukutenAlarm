@@ -69,17 +69,37 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppRoot() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val navController = rememberNavController()
     val backstack = navController.currentBackStackEntryAsState()
     val route = backstack.value?.destination?.route ?: "home"
     // 編集画面の保存アクションをトップバーから呼び出すために登録/保持
     val editSaveAction = remember { mutableStateOf<(() -> Unit)?>(null) }
+    // 戻るボタンのアクションを登録/保持（バリデーション用）
+    val editBackAction = remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // スクロール時にトップバーの影や高さが自然に変化する挙動
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     // アプリ起動時に不足権限のリクエストを行う（POST_NOTIFICATIONS / ACCESS_COARSE_LOCATION）。
     PermissionsAtLaunch()
+
+    // 天気設定の状態を管理（保存時に更新可能）
+    val isConfigured = remember { mutableStateOf<Boolean?>(null) }
+
+    // 初期画面の判定
+    LaunchedEffect(Unit) {
+        val settings = withContext(Dispatchers.IO) { SettingsRepository(context).settingsFlow.first() }
+        isConfigured.value = settings.useCurrentLocation || !settings.selectedOffice.isNullOrBlank()
+    }
+
+    if (isConfigured.value == null) {
+        // 設定読み込み中は真っ白な画面（あるいはスプラッシュ）を表示
+        Surface(color = MaterialTheme.colorScheme.background) {}
+        return
+    }
+
+    val startDestination = if (isConfigured.value == true) "home" else "settings"
 
     Scaffold(
         topBar = {
@@ -96,9 +116,19 @@ private fun AppRoot() {
                     )
                 },
                 navigationIcon = {
-                    // 編集/設定画面では戻るボタンを表示
-                    if (route.startsWith("edit") || route == "settings") {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                    // 編集画面では常に戻るボタンを表示
+                    // 設定画面では、天気設定が未完了の場合は戻るボタンを非表示
+                    val showBackButton = route.startsWith("edit") || 
+                        (route == "settings" && isConfigured.value == true)
+                    
+                    if (showBackButton) {
+                        IconButton(onClick = {
+                            if (editBackAction.value != null) {
+                                editBackAction.value?.invoke()
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }) {
                             Icon(
                                 Icons.AutoMirrored.Outlined.ArrowBack,
                                 contentDescription = stringResource(R.string.action_back)
@@ -146,7 +176,7 @@ private fun AppRoot() {
             color = MaterialTheme.colorScheme.background,
             modifier = Modifier.padding(innerPadding)
         ) {
-            AppNavHost(navController, editSaveAction)
+            AppNavHost(navController, editSaveAction, editBackAction, startDestination, isConfigured)
         }
     }
 }
@@ -197,9 +227,12 @@ private fun PermissionsAtLaunch() {
 @Composable
 private fun AppNavHost(
     navController: NavHostController,
-    editSaveAction: androidx.compose.runtime.MutableState<(() -> Unit)?>
+    editSaveAction: androidx.compose.runtime.MutableState<(() -> Unit)?>,
+    editBackAction: androidx.compose.runtime.MutableState<(() -> Unit)?>,
+    startDestination: String,
+    isConfigured: androidx.compose.runtime.MutableState<Boolean?>
 ) {
-    NavHost(navController = navController, startDestination = "home") {
+    NavHost(navController = navController, startDestination = startDestination) {
         composable("home") {
             AlarmListScreen(
                 onEdit = { id -> navController.navigate("edit/$id") }
@@ -221,8 +254,20 @@ private fun AppNavHost(
         composable("settings") {
             // 設定保存後はアラーム一覧へ戻るため、コールバックを渡す
             SettingsScreen(
-                onSaved = { navController.popBackStack() },
-                registerSave = { action -> editSaveAction.value = action }
+                onSaved = {
+                    // 設定が保存されたので、isConfiguredをtrueに更新
+                    isConfigured.value = true
+                    
+                    if (startDestination == "settings") {
+                        navController.navigate("home") {
+                            popUpTo("settings") { inclusive = true }
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+                registerSave = { action -> editSaveAction.value = action },
+                registerBack = { action -> editBackAction.value = action }
             )
         }
     }

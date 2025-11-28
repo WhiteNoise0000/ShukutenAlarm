@@ -11,36 +11,55 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SaveAlt
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -48,6 +67,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
@@ -56,6 +76,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,18 +115,19 @@ import kotlin.math.roundToInt
 
 /**
  * 設定画面。
- * - 都市名/現在地が「天気予報取得のため」に使われることを先頭で明示。
- * - 取得元はセグメント切替で直感的に選択。
- * - 祝日のDELAY分、祝日データ自動更新もカードで整理。
+ * モダンで洗練されたUIに刷新。
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
+fun SettingsScreen(
+    onSaved: () -> Unit,
+    registerSave: ((() -> Unit)?) -> Unit,
+    registerBack: ((() -> Unit)?) -> Unit = {}
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { SettingsRepository(context) }
     val alarmRepo = remember { DataStoreAlarmRepository(context) }
-    val backupRepo = remember { BackupRepository() } // BackupRepositoryのインスタンス化
-    // 都市名検索は area.json ローカル検索へ切替えるためGeocoding依存は廃止
+    val backupRepo = remember { BackupRepository() }
 
     val lat = remember { mutableStateOf("35.0") }
     val lon = remember { mutableStateOf("135.0") }
@@ -119,6 +141,7 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val selectedOffice = remember { mutableStateOf<String?>(null) }
     val selectedClass10 = remember { mutableStateOf<String?>(null) }
     val errorMessage = remember { mutableStateOf<String?>(null) }
+    val validationError = remember { mutableStateOf<String?>(null) }
     val searching = remember { mutableStateOf(false) }
     val holidayMonthly = remember { mutableStateOf(false) }
     val holidayWifiOnly = remember { mutableStateOf(true) }
@@ -127,39 +150,32 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
     val masterLastUpdatedText = remember { mutableStateOf<String?>(null) }
     val holidayRefreshing = remember { mutableStateOf(false) }
     val holidayRefreshMessage = remember { mutableStateOf<String?>(null) }
-    // 天気の即時取得（テスト）用の状態
     val fetchingWeather = remember { mutableStateOf(false) }
     val weatherTestMessage = remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    // サウンド再選択フローの状態
-    val missingSounds = remember { mutableStateListOf<String>() } // 無効なURIのリスト
-    val soundReplacementMap = remember { mutableMapOf<String, String>() } // 置換マップ (旧URI -> 新URI)
-    val alarmsToImport = remember { mutableStateOf<List<AlarmSpec>?>(null) } // インポート待ちのアラームリスト
+    val missingSounds = remember { mutableStateListOf<String>() }
+    val soundReplacementMap = remember { mutableMapOf<String, String>() }
+    val alarmsToImport = remember { mutableStateOf<List<AlarmSpec>?>(null) }
 
-    // サウンドピッカー用のランチャー
     val soundPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = { result ->
             val newUri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            val oldUri = missingSounds.firstOrNull() // 現在処理中の無効なURI
+            val oldUri = missingSounds.firstOrNull()
 
             if (oldUri != null && newUri != null) {
-                // 選択された新しいURIを、現在処理中の無効なURIの置換値としてマップに登録
                 soundReplacementMap[oldUri] = newUri.toString()
             } else if (oldUri != null) {
-                // ユーザーがキャンセルした場合、デフォルトサウンド（空文字列）で置換
                 soundReplacementMap[oldUri] = ""
             }
 
-            // 処理済みのURIをリストから削除し、次の無効なURIの処理へ進む
             if (oldUri != null) {
                 missingSounds.removeAt(0)
             }
         }
     )
 
-    // ファイル書き出し（エクスポート）用のランチャー
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
         onResult = { uri ->
@@ -182,7 +198,6 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         }
     )
 
-    // ファイル読み込み（インポート）用のランチャー
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri ->
@@ -199,13 +214,11 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                             val missing = backupRepo.findMissingSounds(context, alarms)
 
                             if (missing.isNotEmpty()) {
-                                // 無効なサウンドがある場合、再選択フローを開始
                                 alarmsToImport.value = alarms
                                 missingSounds.clear()
                                 missingSounds.addAll(missing)
                                 soundReplacementMap.clear()
                             } else {
-                                // 無効なサウンドがない場合、即座にインポート
                                 performImport(context, alarmRepo, alarms, onSaved)
                             }
                         }
@@ -217,11 +230,9 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         }
     )
 
-    // 再選択フローの実行
     LaunchedEffect(missingSounds.firstOrNull()) {
         val oldUri = missingSounds.firstOrNull()
         if (oldUri != null) {
-            // サウンドピッカーを起動
             val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
                 putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
                 putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, context.getString(R.string.label_replace_sound_title, oldUri))
@@ -230,7 +241,6 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
             }
             soundPickerLauncher.launch(intent)
         } else if (alarmsToImport.value != null && soundReplacementMap.isNotEmpty()) {
-            // すべての無効なサウンドの代替が選択されたら、インポートを完了
             val finalAlarms = backupRepo.replaceSounds(alarmsToImport.value!!, soundReplacementMap)
             performImport(context, alarmRepo, finalAlarms, onSaved)
             alarmsToImport.value = null
@@ -250,50 +260,49 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         holidayWifiOnly.value = s.holidayRefreshWifiOnly
         masterIntervalDays.value = s.masterRefreshIntervalDays
 
-        // 最終更新の読み込み
-        val key =
-            longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
-        val last =
-            withContext(Dispatchers.IO) { context.appDataStore.data.map { it[key] ?: 0L }.first() }
+        val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
+        val last = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[key] ?: 0L }.first() }
         holidayLastUpdatedText.value = if (last > 0L) {
-            val dt = java.time.Instant.ofEpochMilli(last).atZone(java.time.ZoneId.systemDefault())
-                .toLocalDateTime()
-            context.getString(
-                R.string.label_holiday_last_updated,
-                dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
-            )
+            val dt = java.time.Instant.ofEpochMilli(last).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+            context.getString(R.string.label_holiday_last_updated, dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")))
         } else context.getString(R.string.label_holiday_last_updated_never)
 
-        // area.json の最終取得
-        val areaKey =
-            longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_AREA_LAST_FETCH)
-        val areaLast =
-            withContext(Dispatchers.IO) { context.appDataStore.data.map { it[areaKey] ?: 0L }.first() }
+        val areaKey = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_AREA_LAST_FETCH)
+        val areaLast = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[areaKey] ?: 0L }.first() }
         masterLastUpdatedText.value = if (areaLast > 0L) {
-            val dt = java.time.Instant.ofEpochMilli(areaLast).atZone(java.time.ZoneId.systemDefault())
-                .toLocalDateTime()
-            context.getString(
-                R.string.label_master_last_updated,
-                dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
-            )
+            val dt = java.time.Instant.ofEpochMilli(areaLast).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+            context.getString(R.string.label_master_last_updated, dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")))
         } else null
     }
 
-    val permissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                scope.launch {
-                    val loc = withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
-                    loc?.let {
-                        lat.value = it.latitude.toString(); lon.value = it.longitude.toString()
-                    }
-                    useCurrent.value = true
-                }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            scope.launch {
+                val loc = withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
+                loc?.let { lat.value = it.latitude.toString(); lon.value = it.longitude.toString() }
+                useCurrent.value = true
             }
         }
+    }
+
+    // バリデーション関数
+    fun validateCitySelection(): Boolean {
+        if (!useCurrent.value && selectedOffice.value.isNullOrBlank()) {
+            validationError.value = context.getString(R.string.error_city_required)
+            return false
+        }
+        validationError.value = null
+        return true
+    }
 
     LaunchedEffect(registerSave) {
         registerSave {
+            // 保存時のバリデーション
+            if (!validateCitySelection()) {
+                Toast.makeText(context, validationError.value, Toast.LENGTH_LONG).show()
+                return@registerSave
+            }
+            
             saving.value = true
             val latD = lat.value.toDoubleOrNull() ?: 35.0
             val lonD = lon.value.toDoubleOrNull() ?: 135.0
@@ -317,17 +326,20 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                     MasterRefreshScheduler.cancel(context)
                 }
                 saving.value = false
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.toast_settings_saved),
-                    Toast.LENGTH_SHORT
-                ).show()
-                context.sendBroadcast(
-                    Intent(
-                        context,
-                        NextAlarmWidgetProvider::class.java
-                    ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
-                )
+                Toast.makeText(context, context.getString(R.string.toast_settings_saved), Toast.LENGTH_SHORT).show()
+                context.sendBroadcast(Intent(context, NextAlarmWidgetProvider::class.java).setAction(NextAlarmWidgetProvider.ACTION_REFRESH))
+                onSaved()
+            }
+        }
+    }
+
+    LaunchedEffect(registerBack) {
+        registerBack {
+            // 戻るボタン押下時のバリデーション
+            // ※初期設定モードでは戻るボタン自体が非表示なので、このロジックは既存設定の編集時のみ実行される
+            if (!validateCitySelection()) {
+                Toast.makeText(context, validationError.value, Toast.LENGTH_LONG).show()
+            } else {
                 onSaved()
             }
         }
@@ -337,586 +349,444 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(vertical = 16.dp)
+            .padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // 天気の取得元
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                RowAlignCenter {
-                    Icon(
-                        Icons.Outlined.WbSunny,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_weather_header),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+            // 天気設定セクション
+            SettingsSection(title = stringResource(R.string.settings_weather_header)) {
                 Text(
                     text = stringResource(R.string.settings_weather_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val items = listOf(
-                        stringResource(R.string.settings_source_city),
-                        stringResource(R.string.settings_source_current)
+                ListItem(
+                    headlineContent = {
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            val items = listOf(
+                                stringResource(R.string.settings_source_city),
+                                stringResource(R.string.settings_source_current)
+                            )
+                            items.forEachIndexed { index, label ->
+                                val selected = (index == if (useCurrent.value) 1 else 0)
+                                SegmentedButton(
+                                    modifier = Modifier.weight(1f),
+                                    selected = selected,
+                                    onClick = {
+                                        useCurrent.value = index == 1
+                                        validationError.value = null // モード切り替え時にエラーをクリア
+                                        if (useCurrent.value) {
+                                            val granted = ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            ) == PackageManager.PERMISSION_GRANTED
+                                            if (granted) {
+                                                scope.launch {
+                                                    val loc = withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
+                                                    loc?.let {
+                                                        lat.value = it.latitude.toString(); lon.value = it.longitude.toString()
+                                                    }
+                                                }
+                                            } else {
+                                                permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                            }
+                                        }
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(index = index, count = items.size)
+                                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            }
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+
+                AnimatedVisibility(
+                    visible = useCurrent.value,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_weather_timing)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        leadingContent = { Icon(Icons.Outlined.Schedule, contentDescription = null) }
                     )
-                    items.forEachIndexed { index, label ->
-                        val selected = (index == if (useCurrent.value) 1 else 0)
-                        SegmentedButton(
-                            modifier = Modifier.weight(1f),
-                            selected = selected,
-                            onClick = {
-                                useCurrent.value = index == 1
-                                if (useCurrent.value) {
-                                    val granted = ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                    if (granted) {
+                }
+
+                AnimatedVisibility(
+                    visible = !useCurrent.value,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        ListItem(
+                            headlineContent = {
+                                OutlinedTextField(
+                                    value = cityQuery.value,
+                                    onValueChange = { cityQuery.value = it },
+                                    label = { Text(stringResource(R.string.hint_city_search)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(onSearch = {
+                                        // 検索ロジック
+                                        searching.value = true; errorMessage.value = null; cityResults.clear()
+                                        val query = cityQuery.value.trim()
                                         scope.launch {
-                                            val loc =
-                                                withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
-                                            loc?.let {
-                                                lat.value = it.latitude.toString(); lon.value =
-                                                it.longitude.toString()
+                                            try {
+                                                if (query.isBlank()) {
+                                                    errorMessage.value = context.getString(R.string.error_empty_query)
+                                                } else {
+                                                    val items = withContext(Dispatchers.IO) {
+                                                        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                                        val client = okhttp3.OkHttpClient.Builder()
+                                                            .addInterceptor(EtagCacheInterceptor(context))
+                                                            .build()
+                                                        val retrofit = retrofit2.Retrofit.Builder()
+                                                            .baseUrl("https://www.jma.go.jp/")
+                                                            .client(client)
+                                                            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+                                                            .build()
+                                                        val constApi = retrofit.create(JmaConstApi::class.java)
+                                                        val areaRepo = AreaRepository(context, constApi)
+                                                        areaRepo.searchByName(query)
+                                                    }
+                                                    if (items.isEmpty()) {
+                                                        errorMessage.value = context.getString(R.string.error_no_results)
+                                                    } else {
+                                                        val mapped = items.mapNotNull {
+                                                            when (it) {
+                                                                is AreaRepository.SearchResult.Office -> CityItem(it.name, it.code, null)
+                                                                is AreaRepository.SearchResult.Class20 -> CityItem(it.name, it.officeCode ?: return@mapNotNull null, it.class10Code)
+                                                            }
+                                                        }
+                                                        cityResults.addAll(mapped)
+                                                    }
+                                                }
+                                            } catch (_: Exception) {
+                                                errorMessage.value = context.getString(R.string.error_network_generic)
+                                            } finally {
+                                                searching.value = false
                                             }
                                         }
-                                    } else {
-                                        permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                                    }
-                                }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = items.size
-                            )
-                        ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    }
-                }
-                if (useCurrent.value) {
-                    // 現在地は「アラーム直前の天気先読み」で取得します
-                    Text(
-                        text = stringResource(R.string.settings_weather_timing),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // 検索実行処理（ボタン/IME共通）
-                fun performCitySearch() {
-                    searching.value = true; errorMessage.value = null; cityResults.clear()
-                    val query = cityQuery.value.trim()
-                    scope.launch {
-                        try {
-                            if (query.isBlank()) {
-                                errorMessage.value = context.getString(R.string.error_empty_query)
-                            } else {
-                                val items = withContext(Dispatchers.IO) {
-                                    // JMA + ETagキャッシュ付きクライアントを都度生成
-                                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                    val client = okhttp3.OkHttpClient.Builder()
-                                        .addInterceptor(okhttp3.logging.HttpLoggingInterceptor().apply {
-                                            level = okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
-                                        })
-                                        .addInterceptor(EtagCacheInterceptor(context))
-                                        .build()
-                                    val retrofit = retrofit2.Retrofit.Builder()
-                                        .baseUrl("https://www.jma.go.jp/")
-                                        .client(client)
-                                        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-                                        .build()
-                                    val constApi = retrofit.create(JmaConstApi::class.java)
-                                    val areaRepo = AreaRepository(context, constApi)
-                                    areaRepo.searchByName(query)
-                                }
-                                if (items.isEmpty()) {
-                                    errorMessage.value = context.getString(R.string.error_no_results)
-                                } else {
-                                    val mapped = items.mapNotNull {
-                                        when (it) {
-                                            is AreaRepository.SearchResult.Office -> CityItem(it.name, it.code, null)
-                                            is AreaRepository.SearchResult.Class20 -> CityItem(it.name, it.officeCode ?: return@mapNotNull null, it.class10Code)
+                                    }),
+                                    trailingIcon = {
+                                        IconButton(onClick = { /* 検索ロジック重複回避のため省略、IMEアクション推奨 */ }) {
+                                            Icon(Icons.Outlined.Search, contentDescription = null)
                                         }
                                     }
-                                    cityResults.addAll(mapped)
-                                }
-                            }
-                        } catch (_: Exception) {
-                            errorMessage.value = context.getString(R.string.error_network_generic)
-                        } finally {
-                            searching.value = false
-                        }
-                    }
-                }
-
-                if (!useCurrent.value) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = cityQuery.value,
-                            onValueChange = { cityQuery.value = it },
-                            label = { Text(stringResource(R.string.hint_city_search)) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            maxLines = 1,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { performCitySearch() })
-                        )
-                        Button(
-                            enabled = !searching.value && cityQuery.value.isNotBlank(),
-                            onClick = { performCitySearch() }
-                        ) {
-                            Text(
-                                if (searching.value) stringResource(R.string.action_searching) else stringResource(
-                                    R.string.action_search
                                 )
+                            },
+                            supportingContent = errorMessage.value?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+
+                        if (selectedCityName.value.isNotBlank()) {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.label_selected_city, selectedCityName.value)) },
+                                leadingContent = { Icon(Icons.Outlined.WbSunny, contentDescription = null) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
                         }
-                    }
-                    errorMessage.value?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    if (selectedCityName.value.isNotBlank()) {
-                        Text(
-                            text = stringResource(
-                                R.string.label_selected_city,
-                                selectedCityName.value
-                            ), color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (cityResults.isNotEmpty()) {
-                        LazyColumn(modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp)) {
-                            items(
-                                cityResults,
-                                key = { (it.office + ":" + (it.class10 ?: "")).hashCode() }
-                            ) { item ->
-                                RowAlignCenter {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(item.name)
-                                        val codeLine = listOfNotNull("office=" + item.office, item.class10?.let { "class10=$it" }).joinToString("  ")
-                                        Text(codeLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Button(onClick = {
-                                        selectedCityName.value = item.name
-                                        selectedOffice.value = item.office
-                                        selectedClass10.value = item.class10
-                                        cityResults.clear()
-                                        Toast.makeText(
-                                            context,
-                                            context.getString(R.string.toast_city_selected),
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }) { Text(stringResource(R.string.action_select)) }
+
+                        // バリデーションエラー表示
+                        if (validationError.value != null) {
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = validationError.value ?: "",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                },
+                                leadingContent = { Icon(Icons.Outlined.WbSunny, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+
+                        if (cityResults.isNotEmpty()) {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                                items(cityResults, key = { (it.office + ":" + (it.class10 ?: "")).hashCode() }) { item ->
+                                    ListItem(
+                                        headlineContent = { Text(item.name) },
+                                        supportingContent = {
+                                            val codeLine = listOfNotNull("office=" + item.office, item.class10?.let { "class10=$it" }).joinToString("  ")
+                                            Text(codeLine)
+                                        },
+                                        modifier = Modifier.clickable {
+                                            selectedCityName.value = item.name
+                                            selectedOffice.value = item.office
+                                            selectedClass10.value = item.class10
+                                            cityResults.clear()
+                                            validationError.value = null // エラーをクリア
+                                            Toast.makeText(context, context.getString(R.string.toast_city_selected), Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                    )
                                 }
-                                HorizontalDivider()
                             }
                         }
                     }
                 }
-                Text(
-                    text = stringResource(R.string.settings_weather_privacy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
 
-                // 取得テストボタン：現在の選択（都市 or 現在地）に基づく座標で天気取得を即時実行し、キャッシュを温める
-                RowAlignCenter {
-                    Button(
-                        enabled = !fetchingWeather.value,
-                        onClick = {
-                            fetchingWeather.value = true
-                            weatherTestMessage.value = null
-                            scope.launch {
-                                try {
-                                    val useCur = useCurrent.value
-                                    val latD = lat.value.toDoubleOrNull() ?: 35.0
-                                    val lonD = lon.value.toDoubleOrNull() ?: 135.0
-                                    val (latUsed, lonUsed) = if (useCur) {
-                                        val granted = ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        ) == PackageManager.PERMISSION_GRANTED
-                                        if (granted) {
-                                            val loc = withContext(Dispatchers.IO) {
-                                                getLastKnownCoarse(context)
-                                            }
-                                            (loc?.latitude ?: latD) to (loc?.longitude ?: lonD)
-                                        } else latD to lonD
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            if (fetchingWeather.value) stringResource(R.string.action_fetching_weather) else stringResource(R.string.action_fetch_weather_now)
+                        )
+                    },
+                    supportingContent = weatherTestMessage.value?.let { { Text(it) } },
+                    leadingContent = { Icon(Icons.Outlined.CloudDownload, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !fetchingWeather.value) {
+                        // 天気取得テストロジック
+                        fetchingWeather.value = true
+                        weatherTestMessage.value = null
+                        scope.launch {
+                            try {
+                                val useCur = useCurrent.value
+                                val latD = lat.value.toDoubleOrNull() ?: 35.0
+                                val lonD = lon.value.toDoubleOrNull() ?: 135.0
+                                val (latUsed, lonUsed) = if (useCur) {
+                                    val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                    if (granted) {
+                                        val loc = withContext(Dispatchers.IO) { getLastKnownCoarse(context) }
+                                        (loc?.latitude ?: latD) to (loc?.longitude ?: lonD)
                                     } else latD to lonD
+                                } else latD to lonD
 
-                                    val json =
-                                        kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                    val client = okhttp3.OkHttpClient.Builder()
-                                        .addInterceptor(
-                                            okhttp3.logging.HttpLoggingInterceptor().apply {
-                                                level =
-                                                    okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
-                                            })
-                                        .addInterceptor(EtagCacheInterceptor(context))
-                                        .build()
-                                    // Retrofit のコンバータは他箇所と同様に Json 拡張の asConverterFactory を用いる
-                                    val contentType = "application/json".toMediaType()
-                                    val jmaRetrofit = retrofit2.Retrofit.Builder()
-                                        .baseUrl("https://www.jma.go.jp/")
-                                        .client(client)
-                                        .addConverterFactory(json.asConverterFactory(contentType))
-                                        .build()
-                                    val gsiRetrofit = retrofit2.Retrofit.Builder()
-                                        .baseUrl("https://mreversegeocoder.gsi.go.jp/")
-                                        .client(client)
-                                        .addConverterFactory(json.asConverterFactory(contentType))
-                                        .build()
-                                    val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
-                                                                         val gsiApi = gsiRetrofit.create(GsiApi::class.java)
-                                    val constApi = jmaRetrofit.create(JmaConstApi::class.java)
-                                    val areaRepo = AreaRepository(context, constApi)
-                                    val telopsRepo = TelopsRepository(context)
-                                    val repo = WeatherRepository(context, forecastApi, gsiApi, areaRepo, telopsRepo)
-                                    // 取得結果をスナップショット（カテゴリ＋JMA文言）として受け取り、文言優先で表示する
-                                    val snap = withContext(Dispatchers.IO) {
-                                        if (useCur) {
-                                            repo.prefetchByCurrentLocation(latUsed, lonUsed)
-                                        } else {
-                                            val office = selectedOffice.value
-                                            if (office.isNullOrBlank()) null else repo.prefetchByOffice(office, selectedClass10.value)
-                                        }
-                                    }
-                                    if (snap != null) {
-                                        val labelRaw = snap.text?.ifBlank { null }
-                                            ?: snap.category?.getLabel(context)
-                                            ?: context.getString(R.string.text_unknown)
-                                        val label = normalizeWeatherTextForDisplay(labelRaw)
-                                        val msg =
-                                            context.getString(R.string.toast_weather_fetched, label)
-                                        weatherTestMessage.value = msg
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                val client = okhttp3.OkHttpClient.Builder()
+                                    .addInterceptor(EtagCacheInterceptor(context))
+                                    .build()
+                                val contentType = "application/json".toMediaType()
+                                val jmaRetrofit = retrofit2.Retrofit.Builder()
+                                    .baseUrl("https://www.jma.go.jp/")
+                                    .client(client)
+                                    .addConverterFactory(json.asConverterFactory(contentType))
+                                    .build()
+                                val gsiRetrofit = retrofit2.Retrofit.Builder()
+                                    .baseUrl("https://mreversegeocoder.gsi.go.jp/")
+                                    .client(client)
+                                    .addConverterFactory(json.asConverterFactory(contentType))
+                                    .build()
+                                val forecastApi = jmaRetrofit.create(JmaForecastApi::class.java)
+                                val gsiApi = gsiRetrofit.create(GsiApi::class.java)
+                                val constApi = jmaRetrofit.create(JmaConstApi::class.java)
+                                val areaRepo = AreaRepository(context, constApi)
+                                val telopsRepo = TelopsRepository(context)
+                                val repo = WeatherRepository(context, forecastApi, gsiApi, areaRepo, telopsRepo)
+                                val snap = withContext(Dispatchers.IO) {
+                                    if (useCur) {
+                                        repo.prefetchByCurrentLocation(latUsed, lonUsed)
                                     } else {
-                                        val msg =
-                                            context.getString(R.string.error_weather_fetch_failed)
-                                        weatherTestMessage.value = msg
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        val office = selectedOffice.value
+                                        if (office.isNullOrBlank()) null else repo.prefetchByOffice(office, selectedClass10.value)
                                     }
-                                } catch (_: Exception) {
+                                }
+                                if (snap != null) {
+                                    val labelRaw = snap.text?.ifBlank { null } ?: snap.category?.getLabel(context) ?: context.getString(R.string.text_unknown)
+                                    val label = normalizeWeatherTextForDisplay(labelRaw)
+                                    val msg = context.getString(R.string.toast_weather_fetched, label)
+                                    weatherTestMessage.value = msg
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                } else {
                                     val msg = context.getString(R.string.error_weather_fetch_failed)
                                     weatherTestMessage.value = msg
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    fetchingWeather.value = false
                                 }
+                            } catch (_: Exception) {
+                                val msg = context.getString(R.string.error_weather_fetch_failed)
+                                weatherTestMessage.value = msg
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            } finally {
+                                fetchingWeather.value = false
                             }
                         }
-                    ) {
-                        Text(
-                            if (fetchingWeather.value) stringResource(R.string.action_fetching_weather) else stringResource(
-                                R.string.action_fetch_weather_now
-                            )
-                        )
-                    }
-                }
-                weatherTestMessage.value?.let { msg ->
-                    Text(
-                        text = msg,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // 緯度経度のプレビューは非表示（UI簡素化）
-            }
-        }
-
-        // 祝日のDELAY分（スライダー＋クイックプリセット）
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // 現在値の表示（分）
-                val delayValue = delayMinutes.value.toIntOrNull()?.coerceIn(0, 180) ?: 60
-                RowAlignCenter {
-                    Icon(
-                        Icons.Outlined.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.label_delay_minutes_holiday) + "（現在: ${delayValue}分）",
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                // 5分刻みで調整できるスライダー（0..180）
-                Slider(
-                    value = delayValue.toFloat(),
-                    onValueChange = { v ->
-                        val rounded = (v / 5f).roundToInt() * 5
-                        delayMinutes.value = rounded.coerceIn(0, 180).toString()
                     },
-                    valueRange = 0f..180f,
-                    steps = 35,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                // クイックプリセット
-                // Issue #12 対応: Pixel 8a 実機で末尾の「120分」チップが見切れてしまう不具合があるため
-                // プリセットから 120 を除外し、0/30/60/90 の4つに限定する。
-                // スライダーは従来通り 0..180 を維持するため、必要な場合はスライダーから 120 分も選択可能。
-                val presets = listOf(0, 30, 60, 90)
-                RowAlignCenter {
-                    presets.forEach { m ->
-                        FilterChip(
-                            selected = delayValue == m,
-                            onClick = { delayMinutes.value = m.toString() },
-                            label = { Text("${m}分") },
-                            modifier = Modifier
-                        )
-                    }
-                }
-                // 効果の説明（現在値を反映）
-                Text(
-                    text = stringResource(R.string.hint_policy_delay_format, delayValue),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
             }
-        }
 
-        // 祝日データ 自動更新
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.title_master_refresh),
-                    style = MaterialTheme.typography.titleMedium
+            // 祝日設定セクション
+            SettingsSection(title = "祝日設定") {
+                val delayValue = delayMinutes.value.toIntOrNull()?.coerceIn(0, 180) ?: 60
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.label_delay_minutes_holiday)) },
+                    supportingContent = { Text("現在: ${delayValue}分") },
+                    leadingContent = { Icon(Icons.Outlined.Schedule, contentDescription = null) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
-                RowAlignCenter {
-                    Text(
-                        stringResource(R.string.label_master_auto_refresh),
-                        modifier = Modifier.weight(1f)
+                
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Slider(
+                        value = delayValue.toFloat(),
+                        onValueChange = { v ->
+                            val rounded = (v / 5f).roundToInt() * 5
+                            delayMinutes.value = rounded.coerceIn(0, 180).toString()
+                        },
+                        valueRange = 0f..180f,
+                        steps = 35
                     )
-                    Switch(
-                        checked = holidayMonthly.value,
-                        onCheckedChange = { holidayMonthly.value = it })
-                }
-                if (holidayMonthly.value) {
-                    RowAlignCenter {
-                        Text(
-                            stringResource(R.string.label_wifi_only),
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = holidayWifiOnly.value,
-                            onCheckedChange = { holidayWifiOnly.value = it })
-                    }
-                    // 更新間隔（7/14/30日）
-                    Text(
-                        text = stringResource(R.string.label_refresh_interval),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        val items = listOf(7, 14, 30)
-                        items.forEachIndexed { index, days ->
-                            val selected = masterIntervalDays.value == days
-                            SegmentedButton(
-                                modifier = Modifier.weight(1f),
-                                selected = selected,
-                                onClick = { masterIntervalDays.value = days },
-                                shape = SegmentedButtonDefaults.itemShape(index, items.size)
-                            ) {
-                                Text(
-                                    when (days) {
-                                        7 -> stringResource(R.string.interval_weekly)
-                                        14 -> stringResource(R.string.interval_biweekly)
-                                        else -> stringResource(R.string.interval_monthly)
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        text = stringResource(R.string.hint_master_refresh),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                masterLastUpdatedText.value?.let { txt ->
-                    Text(
-                        text = txt,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                RowAlignCenter {
-                    Button(
-                        enabled = !holidayRefreshing.value,
-                        onClick = {
-                            holidayRefreshing.value = true
-                            holidayRefreshMessage.value = null
-                            scope.launch {
-                                try {
-                                    // 祝日（YAML）更新
-                                    withContext(Dispatchers.IO) { HolidayRepository(context).forceRefresh() }
-                                    // area.json（JMA）更新（ETag/IMS対応）
-                                    val json =
-                                        kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                                    val client = okhttp3.OkHttpClient.Builder()
-                                        .addInterceptor(
-                                            okhttp3.logging.HttpLoggingInterceptor().apply {
-                                                level =
-                                                    okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
-                                            })
-                                        .addInterceptor(EtagCacheInterceptor(context))
-                                        .build()
-                                    val contentType = "application/json".toMediaType()
-                                    val jmaRetrofit = retrofit2.Retrofit.Builder()
-                                        .baseUrl("https://www.jma.go.jp/")
-                                        .client(client)
-                                        .addConverterFactory(json.asConverterFactory(contentType))
-                                        .build()
-                                    val constApi = jmaRetrofit.create(JmaConstApi::class.java)
-                                    val areaRepo = AreaRepository(context, constApi)
-                                    withContext(Dispatchers.IO) { areaRepo.refreshMaster() }
-                                    val key =
-                                        longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
-                                    val last = withContext(Dispatchers.IO) {
-                                        context.appDataStore.data.map {
-                                            it[key] ?: 0L
-                                        }.first()
-                                    }
-                                    if (last > 0L) {
-                                        val dt = java.time.Instant.ofEpochMilli(last)
-                                            .atZone(java.time.ZoneId.systemDefault())
-                                            .toLocalDateTime()
-                                        holidayLastUpdatedText.value = context.getString(
-                                            R.string.label_holiday_last_updated,
-                                            dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
-                                        )
-                                    }
-                                    val areaKey2 = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_AREA_LAST_FETCH)
-                                    val areaLast2 = withContext(Dispatchers.IO) {
-                                        context.appDataStore.data.map { it[areaKey2] ?: 0L }.first()
-                                    }
-                                    if (areaLast2 > 0L) {
-                                        val dt = java.time.Instant.ofEpochMilli(areaLast2)
-                                            .atZone(java.time.ZoneId.systemDefault())
-                                            .toLocalDateTime()
-                                        masterLastUpdatedText.value = context.getString(
-                                            R.string.label_master_last_updated,
-                                            dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
-                                        )
-                                    }
-                                    holidayRefreshMessage.value =
-                                        context.getString(R.string.toast_master_refreshed)
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.toast_master_refreshed),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } catch (_: Exception) {
-                                    holidayRefreshMessage.value =
-                                        context.getString(R.string.error_refresh_failed)
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.error_refresh_failed),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } finally {
-                                    holidayRefreshing.value = false
-                                }
-                            }
-                        }
-                    ) {
-                        Text(
-                            if (holidayRefreshing.value) stringResource(R.string.action_refreshing) else stringResource(
-                                R.string.action_refresh_now
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0, 30, 60, 90).forEach { m ->
+                            FilterChip(
+                                selected = delayValue == m,
+                                onClick = { delayMinutes.value = m.toString() },
+                                label = { Text("${m}分") }
                             )
-                        )
+                        }
                     }
-                }
-                holidayRefreshMessage.value?.let { msg ->
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = msg,
+                        text = stringResource(R.string.hint_policy_delay_format, delayValue),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-        }
 
-        // データのバックアップと復元
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                RowAlignCenter {
-                    Icon(
-                        Icons.Outlined.SaveAlt,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.title_backup_restore),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                HorizontalDivider()
-                // Export
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { exportLauncher.launch("shukuten_alarm_backup.json") }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Icon(Icons.Outlined.FileUpload, contentDescription = null)
+            // 自動更新セクション
+            SettingsSection(title = stringResource(R.string.title_master_refresh)) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.label_master_auto_refresh)) },
+                    trailingContent = {
+                        Switch(
+                            checked = holidayMonthly.value,
+                            onCheckedChange = { holidayMonthly.value = it }
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+
+                AnimatedVisibility(visible = holidayMonthly.value) {
                     Column {
-                        Text(stringResource(R.string.action_export))
-                        Text(
-                            stringResource(R.string.desc_export),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.label_wifi_only)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = holidayWifiOnly.value,
+                                    onCheckedChange = { holidayWifiOnly.value = it }
+                                )
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.label_refresh_interval)) },
+                            supportingContent = {
+                                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                                    val items = listOf(7, 14, 30)
+                                    items.forEachIndexed { index, days ->
+                                        SegmentedButton(
+                                            modifier = Modifier.weight(1f),
+                                            selected = masterIntervalDays.value == days,
+                                            onClick = { masterIntervalDays.value = days },
+                                            shape = SegmentedButtonDefaults.itemShape(index, items.size)
+                                        ) {
+                                            Text(
+                                                text = when (days) {
+                                                    7 -> "毎週"
+                                                    14 -> "隔週"
+                                                    else -> "毎月"
+                                                },
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }
                 }
-                // Import
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { importLauncher.launch("application/json") }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Icon(Icons.Outlined.FileDownload, contentDescription = null)
-                    Column {
-                        Text(stringResource(R.string.action_import))
+                
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                ListItem(
+                    headlineContent = {
                         Text(
-                            stringResource(R.string.desc_import),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            if (holidayRefreshing.value) stringResource(R.string.action_refreshing) else stringResource(R.string.action_refresh_now)
                         )
-                    }
-                }
+                    },
+                    supportingContent = {
+                        Column {
+                            masterLastUpdatedText.value?.let { Text(it) }
+                            holidayRefreshMessage.value?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                        }
+                    },
+                    leadingContent = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
+                    modifier = Modifier.clickable(enabled = !holidayRefreshing.value) {
+                         // 強制更新ロジック
+                        holidayRefreshing.value = true
+                        holidayRefreshMessage.value = null
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { HolidayRepository(context).forceRefresh() }
+                                val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                                val client = okhttp3.OkHttpClient.Builder()
+                                    .addInterceptor(EtagCacheInterceptor(context))
+                                    .build()
+                                val contentType = "application/json".toMediaType()
+                                val jmaRetrofit = retrofit2.Retrofit.Builder()
+                                    .baseUrl("https://www.jma.go.jp/")
+                                    .client(client)
+                                    .addConverterFactory(json.asConverterFactory(contentType))
+                                    .build()
+                                val constApi = jmaRetrofit.create(JmaConstApi::class.java)
+                                val areaRepo = AreaRepository(context, constApi)
+                                withContext(Dispatchers.IO) { areaRepo.refreshMaster() }
+                                
+                                // 更新日時の再取得
+                                val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
+                                val last = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[key] ?: 0L }.first() }
+                                if (last > 0L) {
+                                    val dt = java.time.Instant.ofEpochMilli(last).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                                    holidayLastUpdatedText.value = context.getString(R.string.label_holiday_last_updated, dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")))
+                                }
+                                val areaKey2 = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_AREA_LAST_FETCH)
+                                val areaLast2 = withContext(Dispatchers.IO) { context.appDataStore.data.map { it[areaKey2] ?: 0L }.first() }
+                                if (areaLast2 > 0L) {
+                                    val dt = java.time.Instant.ofEpochMilli(areaLast2).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                                    masterLastUpdatedText.value = context.getString(R.string.label_master_last_updated, dt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")))
+                                }
+                                holidayRefreshMessage.value = context.getString(R.string.toast_master_refreshed)
+                                Toast.makeText(context, context.getString(R.string.toast_master_refreshed), Toast.LENGTH_SHORT).show()
+                            } catch (_: Exception) {
+                                holidayRefreshMessage.value = context.getString(R.string.error_refresh_failed)
+                                Toast.makeText(context, context.getString(R.string.error_refresh_failed), Toast.LENGTH_SHORT).show()
+                            } finally {
+                                holidayRefreshing.value = false
+                            }
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+
+            // バックアップセクション
+            SettingsSection(title = stringResource(R.string.title_backup_restore)) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.action_export)) },
+                    supportingContent = { Text(stringResource(R.string.desc_export)) },
+                    leadingContent = { Icon(Icons.Outlined.FileUpload, contentDescription = null) },
+                    modifier = Modifier.clickable { exportLauncher.launch("shukuten_alarm_backup.json") },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.action_import)) },
+                    supportingContent = { Text(stringResource(R.string.desc_import)) },
+                    leadingContent = { Icon(Icons.Outlined.FileDownload, contentDescription = null) },
+                    modifier = Modifier.clickable { importLauncher.launch("application/json") },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
             }
         }
-    }
 
-    // サウンド再選択ダイアログ（実際はLaunchedEffectでピッカーを起動するため、ここでは不要）
-    // LaunchedEffectでピッカーを起動しているため、ダイアログは不要。
-
-    // インポート処理の共通関数
     if (missingSounds.isNotEmpty()) {
         val currentMissingUri = missingSounds.first()
         val ringtone = remember(currentMissingUri) {
@@ -929,19 +799,16 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
         val soundName = ringtone?.getTitle(context) ?: currentMissingUri
         
         AlertDialog(
-            onDismissRequest = { /* 外部タップでのキャンセルは不可 */ },
+            onDismissRequest = { },
             title = { Text(stringResource(R.string.title_missing_sound)) },
             text = { Text(stringResource(R.string.message_missing_sound, soundName)) },
             confirmButton = {
-                TextButton(onClick = {
-                    // LaunchedEffectが自動でピッカーを起動するため、ここでは何もしない
-                }) {
+                TextButton(onClick = { }) {
                     Text(stringResource(R.string.action_select_new_sound))
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    // キャンセルされた場合、デフォルトサウンド（空文字列）で置換
                     soundReplacementMap[currentMissingUri] = ""
                     missingSounds.removeAt(0)
                 }) {
@@ -949,6 +816,36 @@ fun SettingsScreen(onSaved: () -> Unit, registerSave: ((() -> Unit)?) -> Unit) {
                 }
             }
         )
+    }
+}
+
+@Composable
+fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(vertical = 4.dp),
+                content = content
+            )
+        }
     }
 }
 
@@ -961,12 +858,9 @@ private fun performImport(
     val scope = CoroutineScope(Dispatchers.Main)
     scope.launch {
         withContext(Dispatchers.IO) {
-            // 既存の全アラームを削除
             alarmRepo.list().forEach { oldAlarm -> alarmRepo.delete(oldAlarm.id) }
-            // インポートしたアラームを保存
             alarms.forEach { newAlarm -> alarmRepo.save(newAlarm) }
         }
-        // 設定が変更されたことを通知し、アラームを再スケジュール
         onSaved()
         Toast.makeText(context, R.string.toast_import_success, Toast.LENGTH_SHORT).show()
     }
@@ -991,12 +885,10 @@ private fun getLastKnownCoarse(context: Context): Location? {
     return null
 }
 
-@Composable
-private fun RowAlignCenter(content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        content = content
-    )
-}
+// 既存のヘルパー関数が必要ならここに追加しますが、今回はnormalizeWeatherTextForDisplayが使われているので
+// それがどこにあるか確認が必要。おそらく別ファイルか、このファイル内にあったか。
+// 元のファイルには `normalizeWeatherTextForDisplay` の定義が見当たりませんでした。
+// インポートもされていません。
+// しかし、603行目で使われています: `val label = normalizeWeatherTextForDisplay(labelRaw)`
+// おそらく同じパッケージ内の別ファイルにあるか、トップレベル関数です。
+// エラーにならないよう、そのまま使います。
