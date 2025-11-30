@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -164,7 +166,9 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
                     message = stringResource(R.string.empty_alarms_message)
                 )
             } else {
-                LazyColumn {
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 100.dp)
+                ) {
                     items(list, key = { it.id }) { spec ->
                         AlarmCard(
                             spec = spec,
@@ -391,7 +395,7 @@ private fun AlarmCard(
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         colors = cardColors,
         elevation = cardElevation,
         onClick = { if (!spec.isQuickTimer) onEdit() }
@@ -399,8 +403,8 @@ private fun AlarmCard(
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             // 無効時の表示色調整
             val disabledAlpha = 0.3f
@@ -412,69 +416,44 @@ private fun AlarmCard(
             if (spec.name.isNotBlank()) {
                 Text(
                     text = spec.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = onSurfaceVariantColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            RowAlignCenter {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Icon(
                     Icons.Outlined.Alarm,
                     contentDescription = null,
-                    tint = primaryColor
+                    tint = primaryColor,
+                    modifier = Modifier.size(20.dp)
                 )
                 
                 Text(
                     text = spec.time.formatHHMM(),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = mainTextColor,
                     // 時刻はカードの主役とし、右側の操作アイコン群とのレイアウト競合を避けるため可変幅にする
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = onDuplicate, enabled = !spec.isQuickTimer) {
+                IconButton(onClick = onDuplicate, enabled = !spec.isQuickTimer, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(R.string.action_duplicate)
+                        contentDescription = stringResource(R.string.action_duplicate),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                IconButton(onClick = onDelete) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Outlined.Delete,
-                        contentDescription = stringResource(R.string.action_delete)
-                    )
-                }
-            }
-
-            // 曜日と祝日ポリシーの表示をコンパクトにまとめる（クイックタイマーは非表示）
-            if (!spec.isQuickTimer) {
-                val daysLabel = run {
-                    val ordered = listOf(
-                        DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
-                    )
-                    val selected =
-                        if (spec.daysOfWeek.isEmpty()) ordered else ordered.filter { it in spec.daysOfWeek }
-                    selected.joinToString(" ") { it.getLabel(context) }
-                }
-                val policyLabel = when (spec.holidayPolicy) {
-                    HolidayPolicy.SAME -> stringResource(R.string.policy_same)
-                    HolidayPolicy.DELAY -> stringResource(R.string.policy_delay)
-                    HolidayPolicy.SKIP -> stringResource(R.string.policy_skip)
-                }
-
-                RowAlignCenter {
-                    Text(
-                        text = stringResource(R.string.label_days) + ": " + daysLabel,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = onSurfaceVariantColor
-                    )
-                    Text(
-                        text = policyLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = primaryColor
+                        contentDescription = stringResource(R.string.action_delete),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -485,7 +464,8 @@ private fun AlarmCard(
                     Icon(
                         Icons.Outlined.Snooze,
                         contentDescription = null,
-                        tint = if (spec.enabled) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
+                        tint = if (spec.enabled) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha),
+                        modifier = Modifier.size(20.dp)
                     )
                     Text(
                         text = stringResource(
@@ -523,32 +503,65 @@ private fun AlarmCard(
                                 ).setAction(NextAlarmWidgetProvider.ACTION_REFRESH)
                             )
                         }
-                    }) { Text(stringResource(R.string.action_clear_skip)) }
+                    }) { Text(stringResource(R.string.action_clear_skip), style = MaterialTheme.typography.labelSmall) }
                 }
             }
 
-            RowAlignCenter {
-                // 有効/無効のラベルはスイッチ状態とONE_SHOT設定に応じて動的に表示する。
-                // - 有効時: 「有効」＋ ONE_SHOT の場合は「（1回のみ）」をサフィックス表示
-                // - 無効時: 「無効」
+            // 曜日・ポリシー・スイッチの行
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // 曜日と祝日ポリシーの表示
+                    if (!spec.isQuickTimer) {
+                        val daysLabel = run {
+                            val ordered = listOf(
+                                DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
+                            )
+                            val selected =
+                                if (spec.daysOfWeek.isEmpty()) ordered else ordered.filter { it in spec.daysOfWeek }
+                            selected.joinToString(" ") { it.getLabel(context) }
+                        }
+                        val policyLabel = when (spec.holidayPolicy) {
+                            HolidayPolicy.SAME -> stringResource(R.string.policy_same)
+                            HolidayPolicy.DELAY -> stringResource(R.string.policy_delay)
+                            HolidayPolicy.SKIP -> stringResource(R.string.policy_skip)
+                        }
+
+                        Text(
+                            text = stringResource(R.string.label_days) + ": " + daysLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onSurfaceVariantColor
+                        )
+                        Text(
+                            text = policyLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = primaryColor
+                        )
+                    } else {
+                         if (spec.repeatType == RepeatType.ONE_SHOT) {
+                             Text(
+                                 text = stringResource(R.string.label_one_shot_suffix),
+                                 style = MaterialTheme.typography.bodySmall,
+                                 color = onSurfaceVariantColor
+                             )
+                         }
+                    }
+                }
+
+                // 有効/無効スイッチ
                 val checked = remember(spec.id, refreshKey) { mutableStateOf(spec.enabled) }
                 LaunchedEffect(spec.enabled, refreshKey) { checked.value = spec.enabled }
-                val baseEnabled = stringResource(R.string.label_enabled_toggle)
-                val disabled = stringResource(R.string.label_disabled_toggle)
-                val oneshotSuffix = stringResource(R.string.label_one_shot_suffix)
-                val label = if (checked.value) {
-                    if (spec.repeatType == RepeatType.ONE_SHOT) baseEnabled + oneshotSuffix else baseEnabled
-                } else {
-                    disabled
-                }
-                Text(label, modifier = Modifier.weight(1f), color = mainTextColor)
                 Switch(
                     checked = checked.value,
                     onCheckedChange = { enabled ->
                         checked.value = enabled
                         onToggle(enabled)
                     },
-                    enabled = !spec.isQuickTimer
+                    enabled = !spec.isQuickTimer,
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
         }
