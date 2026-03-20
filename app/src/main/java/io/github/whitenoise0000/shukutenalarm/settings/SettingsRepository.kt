@@ -27,6 +27,8 @@ class SettingsRepository(private val context: Context) {
     private val cityNameKey = stringPreferencesKey(PreferencesKeys.KEY_CITY_NAME)
     private val selectedOfficeKey = stringPreferencesKey(PreferencesKeys.KEY_SELECTED_OFFICE)
     private val selectedClass10Key = stringPreferencesKey(PreferencesKeys.KEY_SELECTED_CLASS10)
+    private val quickTimerRespectSilentModeKey =
+        booleanPreferencesKey(PreferencesKeys.KEY_QUICK_TIMER_RESPECT_SILENT_MODE)
     private val masterRefreshIntervalDaysKey = intPreferencesKey("masterRefreshIntervalDays")
 
     /** 現在の設定のストリームを取得する。*/
@@ -43,7 +45,8 @@ class SettingsRepository(private val context: Context) {
                 masterRefreshIntervalDays = prefs[masterRefreshIntervalDaysKey] ?: 30,
                 cityName = prefs[cityNameKey],
                 selectedOffice = prefs[selectedOfficeKey],
-                selectedClass10 = prefs[selectedClass10Key]
+                selectedClass10 = prefs[selectedClass10Key],
+                quickTimerRespectSilentMode = prefs[quickTimerRespectSilentModeKey] ?: true
             )
         }
 
@@ -72,6 +75,7 @@ class SettingsRepository(private val context: Context) {
             } else {
                 prefs[selectedClass10Key] = settings.selectedClass10
             }
+            prefs[quickTimerRespectSilentModeKey] = settings.quickTimerRespectSilentMode
         }
     }
 }
@@ -92,5 +96,7 @@ data class UserSettings(
     /** 都市名検索で選択したofficeコード */
     val selectedOffice: String? = null,
     /** 都市名検索で選択したclass10コード（任意） */
-    val selectedClass10: String? = null
+    val selectedClass10: String? = null,
+    /** クイックタイマー作成時の「マナー/サイレントに従う」既定値 */
+    val quickTimerRespectSilentMode: Boolean = true
 )

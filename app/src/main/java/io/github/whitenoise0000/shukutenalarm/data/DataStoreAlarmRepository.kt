@@ -68,9 +68,10 @@ class DataStoreAlarmRepository(private val context: Context) {
     /**
      * クイックタイマーを作成する。既存がある場合は上書き。
      * @param time タイマーの時間
+     * @param respectSilentMode マナー/サイレントに従うかどうか
      * @return 新しいアラームのID、作成に失敗した場合はnull
      */
-    suspend fun createQuickTimer(time: LocalTime): Int? {
+    suspend fun createQuickTimer(time: LocalTime, respectSilentMode: Boolean): Int? {
         // 既存のクイックタイマーを削除
         val existing = list().find { it.isQuickTimer }
         if (existing != null) {
@@ -89,6 +90,7 @@ class DataStoreAlarmRepository(private val context: Context) {
             repeatType = RepeatType.ONE_SHOT,
             isQuickTimer = true,
             enabled = true, // 作成時は有効
+            respectSilentMode = respectSilentMode,
             soundMapping = emptyMap() // デフォルトサウンドを使用
         )
 

@@ -1,6 +1,6 @@
 # ShukutenAlarm 仕様書（JMA/GSI対応版・全体）
 
-最終更新: 2025-09-11 / Asia/Tokyo
+最終更新: 2026-03-20 / Asia/Tokyo
 
 ---
 
@@ -32,7 +32,7 @@
 - 現在地連動 or 都市名検索（ローカル）
 - 次アラーム45分前（既定）に天気を先読み（DataStoreキャッシュ）
 - 祝日の更新（WorkManagerによる定期/手動、Wi‑Fiのみオプション）
-- ウィジェット（次回アラーム表示）
+- ウィジェット（次回アラーム表示、2x1基準のサイズ変更対応）
 
 ---
 
@@ -40,8 +40,9 @@
 
 - メイン（アラーム一覧）: 有効/無効切替、編集/追加、次回時刻表示
 - 編集（アラーム設定）: 時刻、曜日、祝日ポリシー、ボリューム、サウンド、バイブ等
+- クイックタイマー登録ダイアログ: 時間候補選択、詳細設定（マナー/サイレントに従う）
 - 設定: 天気取得（都市/現在地）、緯度経度、都市名検索、先読み分、マスタデータ更新（月次/Wi‑Fiのみ）、テスト取得
-- ウィジェット: 次回アラーム時刻・タイトル・祝日状況
+- ウィジェット: 次回アラーム時刻・タイトル・祝日状況を表示。2x1 でも日付と1回スキップ操作を表示し、拡張時はアラーム名など追加情報も表示
 
 ### 3.1 サウンド編集の操作仕様（Issue #3 反映）
 
@@ -60,7 +61,7 @@
 - `VolumeMode`: `SYSTEM`, `CUSTOM`
 - `AlarmSpec`（`app/src/main/java/.../data/model/Models.kt`）
   - `id`, `name`, `time`, `daysOfWeek`, `holidayPolicy`, `volumeMode`, `volumePercent`, `vibrate`, `respectSilentMode`, `holidayOnly`, `prefetchMinutes`, `soundMapping`, `holidaySound`, `enabled`
-- 設定（DataStore）: `latitude`, `longitude`, `useCurrentLocation`, `delayMinutes`, `holidayRefreshMonthly`, `holidayRefreshWifiOnly`, `cityName`, `selectedOffice`, `selectedClass10`
+- 設定（DataStore）: `latitude`, `longitude`, `useCurrentLocation`, `delayMinutes`, `holidayRefreshMonthly`, `holidayRefreshWifiOnly`, `cityName`, `selectedOffice`, `selectedClass10`, `quickTimerRespectSilentMode`
 
 ---
 
@@ -72,6 +73,7 @@
   - 新: `{"timestamp":epoch, "category":"...", "text":"くもり時々雨"}`（JMA文言をそのまま保存。無い場合は省略）
 - 祝日最終取得: `KEY_HOLIDAYS_LAST_FETCH`
 - 都市選択: `KEY_SELECTED_OFFICE`, `KEY_SELECTED_CLASS10`
+- クイックタイマー既定値: `KEY_QUICK_TIMER_RESPECT_SILENT_MODE`
 
 ---
 

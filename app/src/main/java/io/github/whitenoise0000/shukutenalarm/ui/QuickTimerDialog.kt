@@ -1,9 +1,11 @@
 package io.github.whitenoise0000.shukutenalarm.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,10 +33,15 @@ import java.time.LocalTime
 @Composable
 fun QuickTimerDialog(
     onDismiss: () -> Unit,
-    onCreate: (LocalTime) -> Unit
+    initialRespectSilentMode: Boolean,
+    onCreate: (LocalTime, Boolean) -> Unit
 ) {
     val selectedTime = remember { mutableStateOf<LocalTime?>(null) }
     val selectedIndex = remember { mutableStateOf(-1) }
+    val showDetails = remember { mutableStateOf(false) }
+    val respectSilentState = remember(initialRespectSilentMode) {
+        mutableStateOf(initialRespectSilentMode)
+    }
 
     // 時間選択オプションのリスト
     val timeOptions = remember {
@@ -75,31 +83,76 @@ fun QuickTimerDialog(
             )
         },
         text = {
-            LazyColumn {
-                itemsIndexed(timeOptions) { index, item ->
-                    val (label, time) = item
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
+                    itemsIndexed(timeOptions) { index, item ->
+                        val (label, time) = item
+                        Text(
+                            text = label,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (selectedIndex.value == index) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surface
+                                )
+                                .clickable {
+                                    selectedIndex.value = index
+                                    selectedTime.value = time
+                                }
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+
+                TextButton(
+                    onClick = { showDetails.value = !showDetails.value },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
                     Text(
-                        text = label,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (selectedIndex.value == index) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surface
-                            )
-                            .clickable {
-                                selectedIndex.value = index
-                                selectedTime.value = time
-                            }
-                            .padding(vertical = 12.dp, horizontal = 16.dp),
-                        style = MaterialTheme.typography.bodyLarge
+                        stringResource(
+                            if (showDetails.value) R.string.action_hide_quick_timer_details
+                            else R.string.action_show_quick_timer_details
+                        )
                     )
+                }
+
+                AnimatedVisibility(visible = showDetails.value) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.label_quick_timer_details),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.label_respect_silent),
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                            Switch(
+                                checked = respectSilentState.value,
+                                onCheckedChange = { respectSilentState.value = it }
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.hint_quick_timer_respect_silent),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    selectedTime.value?.let { onCreate(it) }
+                    selectedTime.value?.let { onCreate(it, respectSilentState.value) }
                     onDismiss()
                 },
                 enabled = selectedTime.value != null

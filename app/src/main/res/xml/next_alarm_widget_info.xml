@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- ウィジェットのメタデータ（2x1 想定サイズ） -->
+<!-- ウィジェットのメタデータ（2x1 基準でサイズ変更対応） -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="160dp"
-    android:minHeight="58dp"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_next_alarm_2x1"
+    android:previewLayout="@layout/widget_next_alarm_2x1"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />

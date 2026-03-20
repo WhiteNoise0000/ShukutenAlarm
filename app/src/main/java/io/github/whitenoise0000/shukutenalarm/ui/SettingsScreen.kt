@@ -146,6 +146,7 @@ fun SettingsScreen(
     val holidayMonthly = remember { mutableStateOf(false) }
     val holidayWifiOnly = remember { mutableStateOf(true) }
     val masterIntervalDays = remember { mutableStateOf(30) }
+    val quickTimerRespectSilentMode = remember { mutableStateOf(true) }
     val holidayLastUpdatedText = remember { mutableStateOf<String?>(null) }
     val masterLastUpdatedText = remember { mutableStateOf<String?>(null) }
     val holidayRefreshing = remember { mutableStateOf(false) }
@@ -258,6 +259,7 @@ fun SettingsScreen(
         delayMinutes.value = s.delayMinutes.toString()
         holidayMonthly.value = s.holidayRefreshMonthly
         holidayWifiOnly.value = s.holidayRefreshWifiOnly
+        quickTimerRespectSilentMode.value = s.quickTimerRespectSilentMode
         masterIntervalDays.value = s.masterRefreshIntervalDays
 
         val key = longPreferencesKey(io.github.whitenoise0000.shukutenalarm.data.PreferencesKeys.KEY_HOLIDAYS_LAST_FETCH)
@@ -316,7 +318,8 @@ fun SettingsScreen(
                             holidayRefreshWifiOnly = holidayWifiOnly.value,
                             cityName = if (useCurrent.value) null else selectedCityName.value.takeIf { it.isNotBlank() },
                             selectedOffice = if (useCurrent.value) null else selectedOffice.value,
-                            selectedClass10 = if (useCurrent.value) null else selectedClass10.value
+                            selectedClass10 = if (useCurrent.value) null else selectedClass10.value,
+                            quickTimerRespectSilentMode = quickTimerRespectSilentMode.value
                         )
                     )
                 }

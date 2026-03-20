@@ -53,7 +53,7 @@
 
         
 
-        <!-- 次回アラーム 2x1 ウィジェットのプロバイダ登録 -->
+        <!-- 次回アラームウィジェットのプロバイダ登録（2x1 基準・サイズ変更対応） -->
         <receiver
             android:name=".widget.NextAlarmWidgetProvider"
             android:exported="false">

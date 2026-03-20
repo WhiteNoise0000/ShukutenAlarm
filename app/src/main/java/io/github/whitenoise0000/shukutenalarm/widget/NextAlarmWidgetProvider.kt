@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.view.View
 import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.datastore.preferences.core.edit
@@ -23,14 +24,24 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * 2x1 次回アラームウィジェットの AppWidgetProvider。
- * - 次回アラームの日時を表示。
+ * 次回アラームウィジェットの AppWidgetProvider。
+ * - 2x1 を基準サイズとし、領域が広いときは詳細表示へ切り替える。
  * - 「1回スキップ」ボタンで直近のアラームを次回以降へ送る。
  */
 class NextAlarmWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { id -> updateSingle(context, appWidgetManager, id) }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: android.os.Bundle
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        updateSingle(context, appWidgetManager, appWidgetId)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -43,16 +54,24 @@ class NextAlarmWidgetProvider : AppWidgetProvider() {
 
     /** 単一ウィジェットの更新。 */
     private fun updateSingle(context: Context, mgr: AppWidgetManager, widgetId: Int) {
-        val views = RemoteViews(context.packageName, R.layout.widget_next_alarm_2x1)
+        val layoutMode = NextAlarmWidgetLayoutSelector.select(mgr.getAppWidgetOptions(widgetId))
+        val layoutRes = when (layoutMode) {
+            NextAlarmWidgetLayoutMode.COMPACT -> R.layout.widget_next_alarm_2x1
+            NextAlarmWidgetLayoutMode.EXPANDED -> R.layout.widget_next_alarm_expanded
+        }
+        val views = RemoteViews(context.packageName, layoutRes)
 
         val calc = NextAlarmCalculator(context)
         val next = calc.findNext()
+        val isExpanded = layoutMode == NextAlarmWidgetLayoutMode.EXPANDED
 
         if (next == null) {
             views.setTextViewText(R.id.text_title, context.getString(R.string.widget_next_alarm_title))
             views.setTextViewText(R.id.text_time, context.getString(R.string.widget_no_alarm))
             views.setTextViewText(R.id.text_sub, "")
-            views.setViewVisibility(R.id.text_alarm_name, android.view.View.GONE)
+            views.setViewVisibility(R.id.text_sub, View.GONE)
+            views.setViewVisibility(R.id.text_alarm_name, View.GONE)
+            views.setViewVisibility(R.id.button_skip, View.GONE)
         } else {
             val timeFmt = DateTimeFormatter.ofPattern("H:mm", Locale.JAPAN)
             val dateFmt = DateTimeFormatter.ofPattern("M/d(E)", Locale.JAPAN)
@@ -61,12 +80,14 @@ class NextAlarmWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.text_time, dt.toLocalTime().format(timeFmt))
             val holidayMark = if (next.isHoliday) " [" + context.getString(R.string.label_holiday) + "]" else ""
             views.setTextViewText(R.id.text_sub, dt.toLocalDate().format(dateFmt) + holidayMark)
+            views.setViewVisibility(R.id.text_sub, View.VISIBLE)
+            views.setViewVisibility(R.id.button_skip, View.VISIBLE)
 
-            if (next.spec.name.isNotBlank()) {
+            if (isExpanded && next.spec.name.isNotBlank()) {
                 views.setTextViewText(R.id.text_alarm_name, next.spec.name)
-                views.setViewVisibility(R.id.text_alarm_name, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.text_alarm_name, View.VISIBLE)
             } else {
-                views.setViewVisibility(R.id.text_alarm_name, android.view.View.GONE)
+                views.setViewVisibility(R.id.text_alarm_name, View.GONE)
             }
         }
 

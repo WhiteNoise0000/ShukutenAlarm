@@ -38,6 +38,8 @@
     <string name="action_stop">停止</string>
     <string name="action_snooze">スヌーズ</string>
     <string name="action_back">戻る</string>
+    <string name="action_show_quick_timer_details">詳細設定</string>
+    <string name="action_hide_quick_timer_details">詳細設定を閉じる</string>
     <string name="action_fetch_weather_now">今すぐ天気を取得</string>
     <string name="action_fetching_weather">取得中…</string>
 
@@ -102,8 +104,10 @@
     <string name="hint_policy_skip">祝日は鳴動しません（次の対象日にスキップ）</string>
     <string name="hint_holiday_only_days_ignored">祝日のみが対象のため、曜日設定は無視されます</string>
     <string name="hint_respect_silent">注意: マナーやサイレント中は鳴らない場合があります（端末設定・USAGE_ALARMの挙動に依存）</string>
+    <string name="hint_quick_timer_respect_silent">OFF にすると、クイックタイマーはマナー/サイレント中でも鳴動を試みます。この選択は次回以降の初期値に保存されます。</string>
     <string name="text_inherit_default">デフォルト適用</string>
     <string name="label_selected_city">選択中の都市: %1$s</string>
+    <string name="label_quick_timer_details">詳細設定</string>
 
     <!-- トースト -->
     <string name="toast_alarm_saved">アラームを保存しました</string>

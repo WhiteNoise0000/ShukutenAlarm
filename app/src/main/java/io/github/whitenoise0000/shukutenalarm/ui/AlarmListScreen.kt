@@ -60,8 +60,9 @@ import io.github.whitenoise0000.shukutenalarm.data.DataStoreAlarmRepository
 import io.github.whitenoise0000.shukutenalarm.data.appDataStore
 import io.github.whitenoise0000.shukutenalarm.data.model.AlarmSpec
 import io.github.whitenoise0000.shukutenalarm.data.model.HolidayPolicy
-import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import io.github.whitenoise0000.shukutenalarm.data.model.RepeatType
+import io.github.whitenoise0000.shukutenalarm.settings.SettingsRepository
+import io.github.whitenoise0000.shukutenalarm.widget.NextAlarmWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -79,6 +80,7 @@ import java.time.format.DateTimeFormatter
 fun AlarmListScreen(onEdit: (Int) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { DataStoreAlarmRepository(context) }
+    val settingsRepo = remember { SettingsRepository(context) }
     val scheduler = remember { ScheduleManager(context) }
     val list = remember { mutableStateListOf<AlarmSpec>() }
     val scope = rememberCoroutineScope()
@@ -90,11 +92,17 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
     val showConfirmDialog = remember { mutableStateOf(false) }
     // 選択された時間（確認ダイアログ用）
     val selectedTimeForConfirm = remember { mutableStateOf<LocalTime?>(null) }
+    // クイックタイマー既定値と上書き確認用の選択値
+    val quickTimerRespectSilentDefault = remember { mutableStateOf(true) }
+    val selectedRespectSilentForConfirm = remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        val items = withContext(Dispatchers.IO) { repo.list() }
+        val (items, quickTimerRespectSilentMode) = withContext(Dispatchers.IO) {
+            repo.list() to settingsRepo.settingsFlow.first().quickTimerRespectSilentMode
+        }
         val sorted = items.sortedBy { it.time }
         list.clear(); list.addAll(sorted)
+        quickTimerRespectSilentDefault.value = quickTimerRespectSilentMode
     }
 
     // 画面復帰（ON_RESUME）時に一覧を最新化し、カード側のスキップ表示も再計算させる。
@@ -253,10 +261,19 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
     }
 
     // クイックタイマー作成関数
-    val createQuickTimer: (LocalTime) -> Unit = { time ->
+    val createQuickTimer: (LocalTime, Boolean) -> Unit = { time, respectSilentMode ->
         scope.launch {
-            val newId = withContext(Dispatchers.IO) { repo.createQuickTimer(time) }
+            val newId = withContext(Dispatchers.IO) {
+                val currentSettings = settingsRepo.settingsFlow.first()
+                settingsRepo.save(
+                    currentSettings.copy(
+                        quickTimerRespectSilentMode = respectSilentMode
+                    )
+                )
+                repo.createQuickTimer(time, respectSilentMode)
+            }
             if (newId != null) {
+                quickTimerRespectSilentDefault.value = respectSilentMode
                 val items = withContext(Dispatchers.IO) { repo.list() }
                 val sorted = items.sortedBy { it.time }
                 list.clear(); list.addAll(sorted)
@@ -285,14 +302,16 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
     if (showQuickTimerDialog.value) {
         QuickTimerDialog(
             onDismiss = { showQuickTimerDialog.value = false },
-            onCreate = { time ->
+            initialRespectSilentMode = quickTimerRespectSilentDefault.value,
+            onCreate = { time, respectSilentMode ->
                 scope.launch {
                     val existing = withContext(Dispatchers.IO) { repo.list().find { it.isQuickTimer } }
                     if (existing != null) {
                         selectedTimeForConfirm.value = time
+                        selectedRespectSilentForConfirm.value = respectSilentMode
                         showConfirmDialog.value = true
                     } else {
-                        createQuickTimer(time)
+                        createQuickTimer(time, respectSilentMode)
                     }
                 }
                 showQuickTimerDialog.value = false
@@ -306,6 +325,7 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
             onDismissRequest = {
                 showConfirmDialog.value = false
                 selectedTimeForConfirm.value = null
+                selectedRespectSilentForConfirm.value = true
             },
             title = {
                 Text(
@@ -322,9 +342,12 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        selectedTimeForConfirm.value?.let { createQuickTimer(it) }
+                        selectedTimeForConfirm.value?.let {
+                            createQuickTimer(it, selectedRespectSilentForConfirm.value)
+                        }
                         showConfirmDialog.value = false
                         selectedTimeForConfirm.value = null
+                        selectedRespectSilentForConfirm.value = true
                     }
                 ) {
                     Text(stringResource(R.string.action_confirm))
@@ -335,6 +358,7 @@ fun AlarmListScreen(onEdit: (Int) -> Unit) {
                     onClick = {
                         showConfirmDialog.value = false
                         selectedTimeForConfirm.value = null
+                        selectedRespectSilentForConfirm.value = true
                     }
                 ) {
                     Text(stringResource(R.string.text_cancel))

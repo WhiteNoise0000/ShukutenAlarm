@@ -27,6 +27,8 @@ object PreferencesKeys {
     const val KEY_SELECTED_OFFICE = "selectedOffice"
     /** 選択済みclass10コード（未設定時はoffice配下の先頭を使用） */
     const val KEY_SELECTED_CLASS10 = "selectedClass10"
+    /** クイックタイマー作成時の「マナー/サイレントに従う」既定値 */
+    const val KEY_QUICK_TIMER_RESPECT_SILENT_MODE = "quickTimerRespectSilentMode"
     /** 1度スキップの有効期限（epochMillis）,キーは prefix + id */
     const val KEY_SKIP_UNTIL_PREFIX = "skip_until_"
     /** area.json の最終取得時刻（epochMillis） */
